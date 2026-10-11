@@ -2,6 +2,10 @@
 
 MVP para gestionar cartera, priorizar clientes, registrar pagos, generar estrategias y auditar comunicaciones. El código en `app/` y `frontend-react/src/` es la fuente de verdad. `referencias-stitch/` es exclusivamente una referencia visual y no forma parte de la aplicación.
 
+## Inicio rápido de demostración
+
+Para una instalación nueva, siga la [Guía de demo para el asesor](docs/GUIA_DEMO_ASESOR.md): copie `.env.example`, complete la configuración privada y ejecute `scripts/restaurar_demo.sh` y `scripts/deploy_demo.sh`. La demo usa datos ficticios y exige `COMMUNICATIONS_REAL_ENABLED=false`; el despliegue siempre migra antes de arrancar. No restaure sobre una base operativa, no ejecute seeds ni `docker compose down -v`.
+
 ## Arquitectura
 
 ```text
@@ -175,7 +179,7 @@ La migración se ejecuta con la imagen backend recién construida, antes de arra
 | `clientes` | `probabilidad_pago_a_tiempo` |
 | `historial_mensajes` | `contexto_hash` |
 
-Son nueve columnas posibles, más índices en `pagos.deuda_id` y `comunicaciones.external_id`; este último no es único. PostgreSQL aplica la migración dentro de una transacción y con bloqueo asesor para serializar migraciones. No borra datos ni reconstruye tablas; no asocia pagos antiguos por inferencia ni rellena estados de proveedor históricos. `create_all` al arrancar no sustituye esta migración. No ejecutar seeds ni reentrenamiento como parte de una actualización de esquema.
+Son nueve columnas posibles, más índices en `pagos.deuda_id` y `comunicaciones.external_id`; este último no es único. PostgreSQL aplica la migración dentro de una transacción y con bloqueo asesor para serializar migraciones. No borra datos ni reconstruye tablas; no asocia pagos antiguos por inferencia ni rellena estados de proveedor históricos. El backend valida tablas y columnas al arrancar y aborta ante un esquema incompatible, sin crearlo ni migrarlo automáticamente. No ejecutar seeds ni reentrenamiento como parte de una actualización de esquema.
 
 ## Cartera, métricas y pagos
 

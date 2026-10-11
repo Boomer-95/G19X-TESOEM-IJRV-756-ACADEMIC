@@ -22,6 +22,7 @@ from .services.configuracion import estado_proveedores
 from .services.diagnostico_groq import estructura_respuesta
 from .twilio_webhook import router as twilio_router
 from .database import get_db, engine, Base
+from .schema import validar_esquema
 from openai import AsyncOpenAI, APIError, APITimeoutError, APIConnectionError, APIStatusError
 from sqlalchemy import func, or_
 import joblib
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app):
-    Base.metadata.create_all(bind=engine)
+    validar_esquema(engine)
     yield
     if client is not None:
         await client.close()
