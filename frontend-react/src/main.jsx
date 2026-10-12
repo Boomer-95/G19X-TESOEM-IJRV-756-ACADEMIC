@@ -5,7 +5,8 @@ import { msalInstance } from './auth/msalConfig';
 import './index.css';
 import App from './App.jsx';
 import Login from './Login.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
 
 const root = createRoot(document.getElementById('root'));
-root.render(msalInstance ? <StrictMode><MsalProvider instance={msalInstance}><App /></MsalProvider></StrictMode>
-  : <Login configurado={false} />);
+root.render(<ErrorBoundary>{msalInstance ? <StrictMode><MsalProvider instance={msalInstance}><App /></MsalProvider></StrictMode>
+  : <Login configurado={false} />}</ErrorBoundary>);

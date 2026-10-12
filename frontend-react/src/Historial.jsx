@@ -19,11 +19,13 @@ export default function Historial({ referenciaSeccion }) {
     finally { setCargando(false); }
   }
   return <section ref={referenciaSeccion} tabIndex={-1} id="historial" className="panel-grid panel-cartera" aria-labelledby="titulo-historial">
-    <header className="encabezado-seccion"><h2 id="titulo-historial">Historial de estrategias</h2><p className="texto-secundario">Consulta las estrategias y el saldo registrado en cada análisis.</p></header>
+    <div className="historial-cabecera">
+    <header className="encabezado-seccion"><p className="etiqueta-seccion">Trazabilidad</p><h2 id="titulo-historial">Historial de estrategias</h2><p className="texto-secundario">Consulta las estrategias y el saldo registrado en cada análisis.</p></header>
     <form className="input-group" onSubmit={consultar}>
       <label>ID del cliente <input aria-label="ID para historial" type="number" min="1" step="1" required value={id} onChange={e => setId(e.target.value)} /></label>
       <button disabled={cargando}>{cargando ? 'Consultando...' : 'Consultar historial'}</button>
     </form>
+    </div>
     {error && <p className="mensaje-error" role="alert">{error}</p>}
     {registros?.length === 0 && <p>No existe historial para este ID de cliente.</p>}
     {registros && registros.length > 0 && <div className="tabla-wrapper" tabIndex="0" role="region" aria-label="Historial de estrategias">

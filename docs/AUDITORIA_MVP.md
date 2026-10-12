@@ -1,5 +1,11 @@
 # Auditoría técnica y cierre del MVP
 
+## Suite de referencia verificada
+
+La verificación previa a esta revisión aprobó **388 tests backend y 36 tests frontend**. Las cifras inferiores conservadas más abajo corresponden a auditorías históricas, no al total actual. La revisión externa añade tests del diagnóstico de restauración y del ErrorBoundary; el resultado posterior debe consultarse en la ejecución completa de las suites.
+
+Los ajustes acotados incluyen documentación de las diez columnas migrables y `estrategia_id`, retirada de residuos vacíos, pull explícito de PostgreSQL antes de restaurar, diagnóstico técnico sin secretos, ErrorBoundary raíz y distinción entre esquema incompleto y PostgreSQL inaccesible. No se ejecutan migraciones/restauraciones sobre la base operativa ni envíos reales. El ErrorBoundary cubre errores de renderizado del árbol React; los errores de red y handlers asíncronos conservan su manejo existente.
+
 Revisión del 2 de octubre de 2026, sobre `main`, base `8581bc0`. El árbol estaba limpio al iniciar; se revisaron los diez commits más recientes antes de modificar archivos. Cambios locales para revisión, sin commit ni push.
 
 ## Alcance y método

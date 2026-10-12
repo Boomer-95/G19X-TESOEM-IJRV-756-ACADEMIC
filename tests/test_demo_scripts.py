@@ -17,7 +17,8 @@ def demo(tmp_path):
     (tmp_path / 'db').mkdir()
     (tmp_path / 'db/base-de-datos.sql').write_text('SELECT 1;')
     (tmp_path / '.env').write_text('COMMUNICATIONS_REAL_ENABLED=false\n')
-    for nombre in ('restaurar_demo.sh', 'deploy_demo.sh', 'demo_common.sh', 'validar_config_demo.py'):
+    for nombre in ('restaurar_demo.sh', 'deploy_demo.sh', 'demo_common.sh', 'validar_config_demo.py',
+                   'mostrar_error_importacion.py'):
         shutil.copy2(ROOT / 'scripts' / nombre, tmp_path / 'scripts' / nombre)
     config = {'services': {
         'backend': {'environment': {'COMMUNICATIONS_REAL_ENABLED': 'false',
@@ -42,9 +43,13 @@ elif 'exec' in args:
     body=args[-1]
     if 'information_schema.tables' in body:print(os.environ.get('DEMO_TABLES','0'))
     elif '--single-transaction' in body:
-        sys.stdin.read();sys.exit(int(os.environ.get('DEMO_IMPORT_FAIL','0')))
+        sys.stdin.read()
+        assert os.fstat(2).st_mode & 0o777 == 0o600
+        print(os.environ.get('DEMO_IMPORT_STDERR',''),file=sys.stderr)
+        sys.exit(int(os.environ.get('DEMO_IMPORT_FAIL','0')))
     else:print('clientes 15; deudas 23; pagos 40; historial_mensajes 24; comunicaciones 24; metricas_snapshots 15')
 elif 'run' in args:sys.exit(int(os.environ.get('DEMO_MIGRATE_FAIL','0')))
+elif 'pull' in args:sys.exit(int(os.environ.get('DEMO_PULL_FAIL','0')))
 ''')
     docker.chmod(0o755)
 
@@ -85,6 +90,9 @@ def test_restauracion_transaccional_y_conteos(demo):
     assert '"$POSTGRES_USER"' in imports[0][-1] and '"$POSTGRES_DB"' in imports[0][-1]
     assert 'POSTGRES_PASSWORD' not in r.stdout + r.stderr
     assert 'metricas_snapshots 15' in r.stdout
+    pull = next(i for i, c in enumerate(commands) if 'pull' in c)
+    up = next(i for i, c in enumerate(commands) if 'up' in c)
+    assert pull < up
 
 
 @pytest.mark.parametrize('field', ['ENTRA_CLIENT_ID', 'ENTRA_TENANT_ID', 'VITE_ENTRA_CLIENT_ID',
@@ -118,8 +126,39 @@ def test_migracion_fallida_no_inicia_backend(demo):
     assert not any('up' in c and 'backend' in c for c in commands)
 
 
-@pytest.mark.parametrize('extra', [{'DEMO_IMPORT_FAIL': '1'}, {'DEMO_HEALTH': 'unhealthy'}, {'DEMO_BAD_CONFIG': '1'}])
+@pytest.mark.parametrize('extra', [{'DEMO_IMPORT_FAIL': '1'}, {'DEMO_HEALTH': 'unhealthy'},
+                                 {'DEMO_BAD_CONFIG': '1'}, {'DEMO_PULL_FAIL': '1'}])
 def test_fallos_de_entorno_detienen_restauracion(demo, extra):
     r, commands = demo('restaurar_demo.sh', **extra)
     assert r.returncode != 0
     assert 'Conteos reales' not in r.stdout
+
+
+def test_error_importacion_seguro_y_temporal_eliminado(demo, tmp_path):
+    secreto = 'PASSWORD-SENTINELA DATABASE_URL=postgresql://ficticio:secreto@example.invalid/demo'
+    r, commands = demo('restaurar_demo.sh', DEMO_IMPORT_FAIL='1', TMPDIR=str(tmp_path),
+                       DEMO_IMPORT_STDERR=f'ERROR: relation "{secreto}" already exists\nDETAIL: {secreto}\nERROR: {secreto}')
+    assert r.returncode != 0
+    assert 'La relación ya existe.' in r.stderr
+    assert 'Detalle omitido por seguridad.' in r.stderr
+    assert secreto not in r.stdout + r.stderr
+    assert 'PASSWORD-SENTINELA' not in r.stdout + r.stderr
+    assert 'postgresql://' not in r.stdout + r.stderr
+    assert not list(tmp_path.glob('motor-demo-import.*'))
+    assert not any('SELECT' in c[-1] and 'UNION' in c[-1] for c in commands)
+
+
+def test_diagnostico_muestra_solo_ultimas_diez_lineas():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('diagnostico_importacion', ROOT / 'scripts/mostrar_error_importacion.py')
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    lineas = ['ERROR: syntax error at or near contenido-privado'] * 10 + ['ERROR: permission denied for table privada']
+    diagnosticos = modulo.diagnosticos('\n'.join(lineas))
+    assert len(diagnosticos) == 10
+    assert diagnosticos[-1] == 'ERROR: Permisos insuficientes.'
+    assert 'privado' not in '\n'.join(diagnosticos)
+    assert modulo.diagnosticos('psql: error: connection to server failed: Connection refused') == [
+        'ERROR: No se pudo conectar a PostgreSQL.']
+    assert modulo.diagnosticos('psql: error: connection failed: FATAL: password authentication failed for user "privado"') == [
+        'FATAL: Autenticación PostgreSQL fallida.']

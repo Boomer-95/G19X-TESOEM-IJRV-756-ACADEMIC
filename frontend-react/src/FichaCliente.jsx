@@ -64,8 +64,8 @@ export default function FichaCliente({ detalle, alActualizar, alRefrescar }) {
     {confirmacion && <p role="status">{confirmacion}</p>}
     <div className="estrategia-cliente">{detalle.sin_deuda_activa ? <p>El cliente no tiene obligaciones pendientes. No se requiere estrategia de cobranza.</p> : <>
       {detalle.ultima_estrategia ? <>
-        <h4>{detalle.ultima_estrategia.origen_verificado ? 'Última estrategia generada con Groq' : 'Última estrategia guardada · origen histórico no verificado'}</h4>
-        <p className="texto-secundario">{fechaHoraVisible(detalle.ultima_estrategia.fecha)}. Puede corresponder a un saldo anterior.</p>
+        <h4>{detalle.ultima_estrategia.origen_verificado ? 'Última estrategia generada por IA' : 'Última estrategia guardada · origen histórico no verificado'}</h4>
+        <p className="texto-secundario">{detalle.ultima_estrategia.origen_verificado && 'Groq · '}{fechaHoraVisible(detalle.ultima_estrategia.fecha)}. Puede corresponder a un saldo anterior.</p>
         <p className="texto-mensaje mensaje-estrategia">{detalle.ultima_estrategia.mensaje}</p>
         <button className="btn-secundario" onClick={() => procesar(true)} disabled={procesando}>{procesando ? 'Procesando...' : 'Regenerar estrategia con IA'}</button>
       </> : <>

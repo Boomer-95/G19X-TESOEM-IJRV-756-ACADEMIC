@@ -24,7 +24,7 @@ export function Serie({ titulo, datos = [], campo, color = '#0f5b99' }) {
     <div className="analitica-linea" role="group" aria-label={`${titulo}, valores en MXN`}>
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <LineChart data={serie} margin={{ top: 12, right: 20, bottom: 8, left: 0 }} accessibilityLayer>
-          <CartesianGrid stroke="#e4eaf0" strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid stroke="#edf0f4" vertical={false} />
           <XAxis dataKey="instante" type="number" scale="time" domain={dominio}
             ticks={serie.length <= 2 ? serie.map(d => d.instante) : undefined}
             tickFormatter={fechaEje} minTickGap={36} tick={{ fontSize: 11, fill: '#5f6b76' }} tickLine={false} axisLine={{ stroke: '#d8dee4' }} />
@@ -32,9 +32,9 @@ export function Serie({ titulo, datos = [], campo, color = '#0f5b99' }) {
             tick={{ fontSize: 11, fill: '#5f6b76' }} tickLine={false} axisLine={false} />
           <Tooltip labelFormatter={value => new Date(Number(value)).toLocaleDateString('es-MX')}
             formatter={value => [mxn(value), 'Monto MXN']} cursor={{ stroke: '#94a3b8', strokeDasharray: '3 3' }}
-            contentStyle={{ border: '1px solid #d8dee4', borderRadius: 4, fontSize: 13 }} />
-          <Line type="linear" dataKey="monto" name="Monto MXN" stroke={color} strokeWidth={2.5}
-            dot={{ r: 4, fill: color, stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={false} />
+            contentStyle={{ border: '1px solid #dde3eb', borderRadius: 0, boxShadow: 'none', fontSize: 12, padding: '12px 16px' }} />
+          <Line type="linear" dataKey="monto" name="Monto MXN" stroke={color} strokeWidth={2}
+            dot={{ r: 3, fill: color, stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 5 }} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -61,7 +61,7 @@ export function PanelAnalitica({ datos, cargando, error }) {
     <p>Histórico disponible desde: {r.inicio_historico ? fecha(r.inicio_historico) : 'la activación del módulo'}. Se guardan únicamente los días consultados; no se reconstruyen fechas anteriores.</p></div>
     <div className="analitica-graficas">
       <Serie titulo="Evolución de cartera vencida" datos={evolucion} campo="cartera_vencida" />
-      <Serie titulo="Recuperación histórica acumulada · MXN" datos={evolucion} campo="monto_recuperado" color="#087f8c" />
+      <Serie titulo="Recuperación histórica acumulada · MXN" datos={evolucion} campo="monto_recuperado" color="#287659" />
       <article className="grafica-analitica analitica-estrategias"><h3>Estrategias IA / pagos posteriores</h3>{comparacion.map(([titulo, valor]) => <div key={titulo} className="barra-analitica"><span>{titulo}: {valor}</span><meter min="0" max={maximo} value={valor} aria-label={titulo} /></div>)}<p className="analitica-tasa">Tasa de pago posterior en la cohorte contactada: <strong>{r.tasa_pago_post_ia}%</strong></p></article>
       <article className="grafica-analitica analitica-canales"><h3>Efectividad por canal</h3><p>Envíos aceptados y pagos asociados; la entrega solo se confirma con estado del proveedor.</p>
         {canales.map(c => <div className="barra-analitica" key={c.canal}><span>{c.canal}: {c.comunicaciones_enviadas} enviadas · {c.pagos_posteriores_asociados} pagos posteriores</span><meter min="0" max={Math.max(1, ...canales.map(v => v.comunicaciones_enviadas))} value={c.comunicaciones_enviadas} aria-label={`Enviadas ${c.canal}`} /></div>)}
@@ -99,7 +99,7 @@ export default function Analitica({ referenciaSeccion }) {
     return () => controller.abort();
   }, [dias, revision]);
   return <section id="analitica" ref={referenciaSeccion} tabIndex={-1} aria-labelledby="titulo-analitica" className="panel-analitica">
-    <div className="analitica-encabezado"><h2 id="titulo-analitica">Analítica IA · Impacto de Cobranza</h2>
+    <div className="analitica-encabezado"><div><p className="etiqueta-seccion">Seguimiento de resultados</p><h2 id="titulo-analitica">Analítica IA · Impacto de Cobranza</h2></div>
     <div className="input-group"><label>Periodo <select aria-label="Periodo de analítica" value={dias} onChange={e => setDias(Number(e.target.value))}>{[[30, '30 días'], [90, '90 días'], [180, '180 días'], [365, '1 año']].map(([valor, etiqueta]) => <option key={valor} value={valor}>{etiqueta}</option>)}</select></label><button disabled={cargando} onClick={() => setRevision(r => r + 1)}>Actualizar datos</button></div>
     </div>
     <PanelAnalitica datos={datos} cargando={cargando} error={error} />

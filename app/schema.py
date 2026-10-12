@@ -9,6 +9,7 @@ SCHEMA_ERROR = (
     "Esquema de base de datos desactualizado o incompleto. "
     "Ejecute: python -m app.migrate"
 )
+DATABASE_ERROR = 'No se pudo verificar la base de datos. Compruebe PostgreSQL.'
 
 
 def validar_esquema(bind):
@@ -27,4 +28,4 @@ def validar_esquema(bind):
                     raise RuntimeError(SCHEMA_ERROR)
     except SQLAlchemyError:
         # Los errores de conexión/introspección pueden contener credenciales.
-        raise RuntimeError(SCHEMA_ERROR) from None
+        raise RuntimeError(DATABASE_ERROR) from None

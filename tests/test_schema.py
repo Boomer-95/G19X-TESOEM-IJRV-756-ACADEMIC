@@ -6,7 +6,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
 
 from app import main
-from app.schema import SCHEMA_ERROR, validar_esquema
+from app.schema import DATABASE_ERROR, SCHEMA_ERROR, validar_esquema
 
 
 def test_esquema_correcto_permite_arranque(db, monkeypatch):
@@ -48,19 +48,30 @@ def test_esquema_incompleto_aborta_sin_reparar(db, monkeypatch, sql):
     assert antes == despues
 
 
-def test_error_conexion_no_expone_credenciales():
+def test_error_conexion_no_expone_credenciales(monkeypatch):
     secreto = 'postgresql://ficticio:password_sentinela@example.invalid/demo'
 
     class Bind:
         def connect(self):
             raise OperationalError(secreto, {}, Exception(secreto))
 
-    with pytest.raises(RuntimeError) as exc:
-        validar_esquema(Bind())
-    mensaje = ''.join(traceback.format_exception(exc.value))
-    assert str(exc.value) == SCHEMA_ERROR
-    assert secreto not in mensaje
-    assert 'password_sentinela' not in mensaje
+    from app import schema
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    def inspeccion_fallida(conn):
+        raise OperationalError(secreto, {}, Exception(secreto))
+
+    monkeypatch.setattr(schema, 'inspect', inspeccion_fallida)
+    # Tanto conectar como introspectar deben dar el error de disponibilidad.
+    for bind in (Bind(), SimpleNamespace(connect=lambda: nullcontext(object()))):
+        with pytest.raises(RuntimeError) as exc:
+            validar_esquema(bind)
+        mensaje = ''.join(traceback.format_exception(exc.value))
+        assert str(exc.value) == DATABASE_ERROR
+        assert str(exc.value) != SCHEMA_ERROR
+        assert secreto not in mensaje
+        assert 'password_sentinela' not in mensaje
 
 
 def test_postgresql_inspecciona_public(monkeypatch):

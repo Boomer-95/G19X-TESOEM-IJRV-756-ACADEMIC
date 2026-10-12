@@ -1,5 +1,11 @@
 # QA
 
+## Suite de referencia verificada
+
+La última verificación anterior a los ajustes de auditoría externa aprobó **388 tests backend y 36 tests frontend**. Estos son los resultados de referencia actuales; las cifras de las secciones siguientes describen verificaciones históricas y no deben interpretarse como el total vigente.
+
+Las mejoras de esta revisión añaden cobertura del ErrorBoundary raíz y de diagnóstico seguro de restauración. El total posterior se obtiene ejecutando las suites, sin reutilizar ni inventar cifras. Los tests de backend usan bases aisladas y proveedores mockeados; no se ejecuta la restauración sobre PostgreSQL operativo.
+
 ## Status Callback Twilio
 
 319 pruebas Python y 11 de frontend aprobadas (330 total). La suite del callback usa RequestValidator real con token/SID ficticios, TestClient, SDK Twilio mockeado y SQLite en memoria con conexiones externas bloqueadas. Incluye delivered/read/failed/undelivered y estados intermedios, firma válida/inválida/ausente, campos nuevos en la firma, URL pública detrás de proxy, ausencia de JWT, SID desconocido/ausente/ambiguo, formato incorrecto, AccountSid ajeno, repeticiones, conservación de mensaje/cliente/canal, aislamiento de simulados/Email/Voice, eventos atrasados, códigos de error seguros, límite de body y callback temprano que no se sobrescribe al registrar el envío. La migración se ejecuta dos veces sobre datos heredados de prueba y conserva filas, con provider_status inicialmente NULL.

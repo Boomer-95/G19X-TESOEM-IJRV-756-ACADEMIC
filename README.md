@@ -174,12 +174,12 @@ La migración se ejecuta con la imagen backend recién construida, antes de arra
 
 | Tabla | Columnas añadidas si faltan |
 |---|---|
-| `comunicaciones` | `modo`, `estado`, `provider`, `external_id`, `error_tecnico`, `provider_status` |
+| `comunicaciones` | `modo`, `estado`, `provider`, `external_id`, `error_tecnico`, `provider_status`, `estrategia_id` (FK a `historial_mensajes`) |
 | `pagos` | `deuda_id`, anulable y con FK a `deudas` |
 | `clientes` | `probabilidad_pago_a_tiempo` |
 | `historial_mensajes` | `contexto_hash` |
 
-Son nueve columnas posibles, más índices en `pagos.deuda_id` y `comunicaciones.external_id`; este último no es único. PostgreSQL aplica la migración dentro de una transacción y con bloqueo asesor para serializar migraciones. No borra datos ni reconstruye tablas; no asocia pagos antiguos por inferencia ni rellena estados de proveedor históricos. El backend valida tablas y columnas al arrancar y aborta ante un esquema incompatible, sin crearlo ni migrarlo automáticamente. No ejecutar seeds ni reentrenamiento como parte de una actualización de esquema.
+Son diez columnas posibles, más índices en `pagos.deuda_id`, `comunicaciones.estrategia_id` y `comunicaciones.external_id`; este último no es único. PostgreSQL aplica la migración dentro de una transacción y con bloqueo asesor para serializar migraciones. No borra datos ni reconstruye tablas; no asocia pagos antiguos por inferencia ni rellena estados de proveedor históricos. El backend valida tablas y columnas al arrancar y aborta ante un esquema incompatible, sin crearlo ni migrarlo automáticamente. No ejecutar seeds ni reentrenamiento como parte de una actualización de esquema.
 
 ## Cartera, métricas y pagos
 

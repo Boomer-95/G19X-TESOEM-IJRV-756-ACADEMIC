@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "node tests/comunicacion.test.cjs && node tests/historial.test.cjs && node tests/api.test.cjs && node tests/cartera.test.cjs && node tests/analitica.test.cjs",
+    "test": "node tests/comunicacion.test.cjs && node tests/historial.test.cjs && node tests/api.test.cjs && node tests/cartera.test.cjs && node tests/analitica.test.cjs && node tests/errorBoundary.test.cjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",

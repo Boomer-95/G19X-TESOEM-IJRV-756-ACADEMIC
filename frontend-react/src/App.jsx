@@ -175,6 +175,7 @@ function Dashboard({ nombreAdmin, handleLogout }) {
         </header>
 
         <section ref={node => { seccionesRef.current.resumen = node; }} tabIndex={-1} id="resumen" className="header-dashboard" aria-labelledby="titulo-resumen">
+          <p className="etiqueta-seccion">Visión general</p>
           <h2 id="titulo-resumen">Resumen de cartera</h2>
           {errorMetricas && <p role="alert" className="mensaje-error">{errorMetricas}</p>}
           <div className="grid-metricas">
@@ -187,6 +188,7 @@ function Dashboard({ nombreAdmin, handleLogout }) {
         </section>
 
         <section ref={node => { seccionesRef.current.operacion = node; }} tabIndex={-1} id="operacion" aria-labelledby="titulo-operacion">
+          <p className="etiqueta-seccion">Gestión individual</p>
           <h2 id="titulo-operacion">Operación de Cobranza</h2>
           <div className="grid-operacion">
             <div className="panel-grid selector-cliente">
@@ -202,6 +204,7 @@ function Dashboard({ nombreAdmin, handleLogout }) {
                 </div>
               </form>
               {errorStatus && <p className="mensaje-error" role="alert">{errorStatus}</p>}
+              <div className="contexto-selector"><Icono nombre="cartera" /><p>La ficha reúne el saldo, el riesgo y la última estrategia del cliente. Los pagos y las comunicaciones se consultan en sus apartados.</p></div>
             </div>
             <div id="resultado-analisis" className="panel-grid" ref={fichaRef} tabIndex={-1} aria-labelledby="titulo-resultado">
               <h3 id="titulo-resultado">Resultado del análisis</h3>
