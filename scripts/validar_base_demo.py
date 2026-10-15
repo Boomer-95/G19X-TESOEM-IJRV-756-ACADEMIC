@@ -1,10 +1,84 @@
 """Valida exclusivamente la base restaurada de entrega en el socket temporal."""
 import json
+from datetime import date, timedelta
 import os
 from pathlib import Path
 import re
 import socket
 import sys
+
+
+def comprobar_inferencia_demo(db, cliente_http):
+    """Contrasta SQL restaurado, inferencia real y respuestas del backend."""
+    from app import main, models
+    from app.ml.features import FEATURE_COLUMNS, extraer_features_cliente
+    from app.services.analitica import cartera_actual
+
+    assert main._modelo_riesgo is not None
+    assert main._columnas_modelo == FEATURE_COLUMNS
+    clientes = db.query(models.Cliente).order_by(models.Cliente.id).all()
+    assert len(clientes) == 15
+    respuesta = cliente_http.get('/api/clientes')
+    assert respuesta.status_code == 200
+    listado = {c['cliente_id']: c for c in respuesta.json()}
+    filas = []
+    for c in clientes:
+        saldo = sum(d.saldo_pendiente for d in c.deudas if d.saldo_pendiente > 0)
+        if c.id in (13, 14):
+            probabilidad = score = None
+            segmento = 'No definido'
+        elif saldo == 0:
+            probabilidad = score = None
+            segmento = 'Sin deuda'
+        else:
+            features = extraer_features_cliente(db, c)
+            frame = main.pd.DataFrame([features])[FEATURE_COLUMNS]
+            p = float(main._modelo_riesgo.predict_proba(frame)[0][1])
+            probabilidad, score = round(p, 3), round(1 - p, 3)
+            segmento = ('Bajo riesgo' if score < .33 else
+                        'Riesgo medio' if score < .66 else 'Alto riesgo')
+        assert (c.probabilidad_pago_a_tiempo, c.score_riesgo, c.segmento) == (probabilidad, score, segmento), c.id
+        for d in c.deudas:
+            assert d.probabilidad_pago == (probabilidad if d.saldo_pendiente > 0 else None), d.id
+        prioridad = round((score or 0) * saldo, 2)
+        detalle = cliente_http.get(f'/api/clientes/{c.id}')
+        assert detalle.status_code == 200
+        for dato in (listado[c.id], detalle.json()):
+            assert dato['folio'] == f'CL-{c.id:06d}'
+            assert (dato['probabilidad_pago_a_tiempo'], dato['score_riesgo'], dato['segmento']) == (probabilidad, score, segmento)
+            assert dato['saldo_pendiente'] == saldo
+            assert dato['prioridad'] == prioridad
+        filas.append(dict(id=c.id, folio=f'CL-{c.id:06d}', probabilidad=probabilidad,
+                          score=score, segmento=segmento, saldo=saldo, prioridad=prioridad))
+    cartera = cliente_http.get('/api/cartera-priorizada')
+    assert cartera.status_code == 200
+    cartera = cartera.json()
+    activas = [f for f in filas if f['saldo'] > 0]
+    assert {c['cliente_id'] for c in cartera} == {f['id'] for f in activas}
+    assert [c['prioridad'] for c in cartera] == sorted((f['prioridad'] for f in activas), reverse=True)
+    for c in cartera:
+        assert c['prioridad'] == next(f['prioridad'] for f in filas if f['id'] == c['cliente_id'])
+    assert {c['cliente_id'] for c in cartera[-2:]} == {13, 14}
+    sin_evaluar = cliente_http.get('/api/clientes?analizado=false')
+    assert sin_evaluar.status_code == 200
+    assert {c['cliente_id'] for c in sin_evaluar.json()} == {13, 14}
+    bajos = cliente_http.get('/api/clientes?segmento=Bajo%20riesgo')
+    assert bajos.status_code == 200
+    assert not {13, 14, 15} & {c['cliente_id'] for c in bajos.json()}
+    # Cobertura explícita de los cinco casos de aceptación.
+    assert filas[0]['segmento'] == 'Bajo riesgo'
+    assert filas[4]['segmento'] == 'Riesgo medio'
+    assert filas[2]['segmento'] == 'Alto riesgo'
+    assert filas[12]['score'] is None and filas[12]['segmento'] == 'No definido'
+    assert filas[14]['saldo'] == 0 and filas[14]['segmento'] == 'Sin deuda'
+    actual = cartera_actual(db)
+    snapshot = db.query(models.MetricaSnapshot).order_by(models.MetricaSnapshot.fecha.desc()).first()
+    assert snapshot.clientes_alto_riesgo == actual['clientes_alto_riesgo']
+    assert snapshot.deudores_activos == actual['deudores_activos']
+    resumen = cliente_http.get('/api/analitica/resumen?dias=30')
+    assert resumen.status_code == 200
+    assert resumen.json()['clientes_alto_riesgo'] == actual['clientes_alto_riesgo']
+    return filas
 
 
 def validar(url, archivo):
@@ -28,7 +102,7 @@ def validar(url, archivo):
         raise ValueError('Correos del dump fuera de la lista ficticia permitida.')
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from sqlalchemy import inspect, text
-    from app.database import engine, Base
+    from app.database import engine, Base, get_db
     from app import models  # noqa: F401
     esperados = dict(clientes=15, deudas=23, pagos=40, historial_mensajes=24,
                      comunicaciones=24, metricas_snapshots=15, administradores=0)
@@ -82,9 +156,21 @@ def validar(url, archivo):
              '/ia/historial/1', '/api/analitica/resumen?dias=30',
              '/api/analitica/canales?dias=30', '/api/analitica/evolucion?dias=30', '/api/integraciones/estado']
     estados = {}
+    # Los GET de evolución hacen upsert de snapshots: aislar también esos
+    # efectos y deshacerlos al acabar, conservando los conteos del dump.
+    from sqlalchemy.orm import sessionmaker
+    conexion_backend = engine.connect()
+    transaccion_backend = conexion_backend.begin()
+    SesionValidacion = sessionmaker(bind=conexion_backend, join_transaction_mode='create_savepoint')
+    def db_validacion():
+        with SesionValidacion() as db:
+            yield db
+    main.app.dependency_overrides[get_db] = db_validacion
     try:
         # Sin lifespan: la validación no crea tablas; el SQL es la única fuente del esquema.
         cliente = TestClient(main.app)
+        with SesionValidacion() as db:
+            inferencias = comprobar_inferencia_demo(db, cliente)
         for ruta in rutas:
             respuesta = cliente.get(ruta)
             assert respuesta.status_code == 200, (ruta, respuesta.status_code)
@@ -92,14 +178,25 @@ def validar(url, archivo):
             if '/resumen?' in ruta:
                 assert respuesta.json()['monto_recuperado_post_ia'] == 0
             if '/evolucion?' in ruta:
-                assert len(respuesta.json()) >= 15
+                with SesionValidacion() as db:
+                    fechas = [s.fecha.isoformat() for s in db.query(models.MetricaSnapshot).filter(
+                        models.MetricaSnapshot.fecha.between(date.today() - timedelta(days=29), date.today())
+                    ).order_by(models.MetricaSnapshot.fecha)]
+                assert [fila['fecha'] for fila in respuesta.json()] == fechas
+                assert fechas
         cliente.close()
     finally:
         main.app.dependency_overrides.clear()
+        transaccion_backend.rollback()
+        conexion_backend.close()
         socket.socket.connect = conectar
         engine.dispose()
+    with engine.connect() as conn:
+        conteos_finales = {t: conn.scalar(text(f'SELECT count(*) FROM {t}')) for t in esperados}
+        assert conteos_finales == esperados, conteos_finales
+    engine.dispose()
     print(json.dumps({'conteos_importados': conteos, 'comprobaciones': resultados,
-                      'endpoints': estados, 'seguridad_sql': 'OK'}, ensure_ascii=False, indent=2))
+                      'conteos_tras_backend': conteos_finales, 'endpoints': estados, 'inferencia_y_prioridad': inferencias, 'seguridad_sql': 'OK'}, ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

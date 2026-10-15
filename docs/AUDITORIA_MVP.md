@@ -2,7 +2,7 @@
 
 ## Suite de referencia verificada
 
-La verificación previa a esta revisión aprobó **388 tests backend y 36 tests frontend**. Las cifras inferiores conservadas más abajo corresponden a auditorías históricas, no al total actual. La revisión externa añade tests del diagnóstico de restauración y del ErrorBoundary; el resultado posterior debe consultarse en la ejecución completa de las suites.
+La verificación de referencia previa a aquella revisión aprobó **388 tests backend y 36 tests frontend**. Se conserva como evidencia histórica, no como total actual. La auditoría original y sus resultados se mantienen más abajo; los cambios posteriores del modelo, demo y Evaluar cartera se documentan al final, sin convertir ejecuciones separadas en una suite única.
 
 Los ajustes acotados incluyen documentación de las diez columnas migrables y `estrategia_id`, retirada de residuos vacíos, pull explícito de PostgreSQL antes de restaurar, diagnóstico técnico sin secretos, ErrorBoundary raíz y distinción entre esquema incompleto y PostgreSQL inaccesible. No se ejecutan migraciones/restauraciones sobre la base operativa ni envíos reales. El ErrorBoundary cubre errores de renderizado del árbol React; los errores de red y handlers asíncronos conservan su manejo existente.
 
@@ -16,7 +16,7 @@ Los tests de backend eliminan credenciales del entorno, deshabilitan dotenv, usa
 
 PostgreSQL solo recibió SELECT sobre filas ficticias construidas con VALUES para demostrar el orden de fechas nulas. No se consultaron ni modificaron tablas de negocio. La configuración de Compose se validó sin imprimir variables sensibles. El escaneo Git examinó 189 blobs textuales históricos con patrones de claves/tokens: sin coincidencias; esto no sustituye un escáner de secretos especializado.
 
-## Clasificación
+## Clasificación de la auditoría histórica
 
 | Área | Estado | Problema encontrado | Corrección realizada | Evidencia/prueba | Pendiente manual |
 |---|---|---|---|---|---|
@@ -53,7 +53,7 @@ PostgreSQL solo recibió SELECT sobre filas ficticias construidas con VALUES par
 
 9. Aunque la ficha ocultaba cobranza sin deuda, una llamada directa a `/api/comunicaciones` podía contactar a un cliente liquidado. Los cuatro canales reprodujeron el problema con mocks. La API ahora responde 409 antes de adaptación/proveedor, sin persistir comunicaciones ni llamar Groq. Fixtures de tests de envío ahora incluyen deuda activa controlada.
 
-## Decisiones de no modificación
+## Decisiones de no modificación en aquella auditoría
 
 - No cambiar IDs, tenant, scopes, secretos, MSAL, api.js ni autenticación backend; se amplían pruebas del transporte sin alterar su código.
 - No reentrenar Random Forest ni incorporar features nuevas: se cambiaría un modelo funcional sin validación. Las seis features reales y sus supuestos quedan documentados.
@@ -102,3 +102,30 @@ No se construyeron/recrearon imágenes o servicios en esta auditoría; no se eje
 - [Groq: disponibilidad y deprecaciones por plan](https://console.groq.com/docs/deprecations).
 
 Estimación de cierre técnico: aproximadamente 90% del MVP de demostración. Es una valoración cualitativa, no un porcentaje de cobertura ni una certificación de producción. Las verificaciones externas y las dependencias de desarrollo pendientes impiden declararlo cerrado al 100%.
+
+
+## Actualización posterior: modelo, demo y Evaluar cartera
+
+La clasificación, el “ningún cambio del modelo” y la decisión de no reentrenar anteriores describen aquella auditoría, no una prohibición vigente ni el artefacto actual. El usuario aprobó después el nuevo modelo y la demo coherente; esta actualización final es exclusivamente documental.
+
+| Área | Estado posterior y evidencia | Límites conservados |
+| --- | --- | --- |
+| Modelo local | RandomForestClassifier y seis features conservados; reentrenado con 12,000 historiales sintéticos. ROC AUC .8464, accuracy .7558, precision .6118, recall .8208, F1 .7010. 147 tests relacionados aprobaron en aquella fase. | Métricas exclusivamente sintéticas, sin validación empresarial, calibración ni certificación para producción. La importancia de frecuencia/severidad tardía es relativa al bosque, no causal. |
+| Demo coherente | Seed usa el mismo pipeline real para los evaluados; ya no hay scores manuales. 13/14 inicialmente sin evaluar, 15 sin deuda; conteos intactos. 140 tests distintos de esa fase y restauración/backend PostgreSQL aislados aprobados. | Nombres, historial, estrategias, comunicaciones y snapshots son ficticios; no acreditan recuperación real. |
+| Evaluar cartera | `POST /api/cartera/evaluar` y botón en Cartera. Reutiliza `recalcular_riesgo`, omite completos y confirma/revierte cada cliente por separado. 133 backend + 43 frontend aprobados, lint y build correctos. | Sin Groq/estrategias/comunicaciones/pagos/deuda. No hay caducidad temporal o versionado de evaluación ni “reevaluar todos”. No es un proceso programado. |
+| Integración PostgreSQL del lote | 14 activos, 2 evaluados, 12 omitidos y 0 fallidos; dos solicitudes simultáneas no duplicaron evaluaciones. Lectura directa confirmó 13 = .72/.28/Bajo riesgo y 14 = .953/.047/Bajo riesgo. | Prueba en clúster nuevo aislado y detenido después; autenticación sustituida solo en TestClient. No certifica el resto de bloqueos, carga o persistencia Docker. |
+
+Son ejecuciones distintas, sin nuevo total agregado; [QA](QA.md#validación-posterior-a-mejora-del-modelo) detalla su procedencia. Ninguna de estas fases llamó a Groq/Twilio/SendGrid ni tocó la base operativa. No se realizaron de nuevo las suites en esta revisión documental. Se conserva la evidencia histórica de pruebas externas puntuales, sin extenderla a toda la aplicación.
+
+La prioridad sigue siendo score × saldo: índice interno de ordenamiento, **no dinero**, que combina riesgo estimado e impacto económico. El lote permite que activos pendientes dejen de tener prioridad cero por ausencia de evaluación individual; hay que ejecutarlo y atender fallos. No implica estrategia nueva, canal recomendado ni recuperación causada por IA. El modelo predictivo y Groq son las dos capas de IA; la analítica interpreta registros y no es un tercer modelo.
+
+Los pendientes externos de esta auditoría histórica siguen requiriendo evidencia específica para Entra/navegador, pagos concurrentes, callbacks/entregas y operación con volúmenes. La comprobación de lotes no los da por cerrados. Los avisos de dependencias y el porcentaje cualitativo de cierre de la auditoría original son históricos: no se repitió npm audit ni se calculó un nuevo porcentaje aquí.
+
+Ver [Modelo ML](MODELO_ML.md), [Evaluar cartera](EVALUAR_CARTERA.md) y [Decisiones técnicas](DECISIONES_TECNICAS.md).
+
+
+### Afirmaciones documentales pendientes fuera de este ajuste
+
+`frontend-react/README.md` conserva instrucciones de autenticación anteriores: menciona JWT guardado manualmente en localStorage y eliminar una clave `token`. El código actual usa MSAL y sessionStorage; no seguir esa prueba antigua para certificar sesión. La referencia vigente es [README — Microsoft Entra](../README.md#microsoft-entra) y [Seguridad](SEGURIDAD.md). Se señala para una revisión específica de ese documento, sin tocar autenticación ni código.
+
+Las cifras y recomendaciones históricas de npm audit requieren un análisis nuevo antes de afirmarlas como estado vigente de vulnerabilidades; no se consultaron registros de paquetes ni se ejecutó audit aquí. Los requerimientos originales sobre recomendaciones financieras y automatización siguen siendo visión histórica, no capacidades implementadas.

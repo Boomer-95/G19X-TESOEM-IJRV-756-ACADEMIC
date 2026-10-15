@@ -2,9 +2,23 @@
 
 React/Vite conserva sidebar, tablas y paneles empresariales. FastAPI autentica cada endpoint protegido con access tokens Microsoft Entra ID y SQLAlchemy accede a PostgreSQL. Se conservan login, comunicación simulada, historial y cartera priorizada.
 
-Flujo: PostgreSQL (deudas + pagos) → features → Random Forest → probabilidad, score y segmento → contexto mínimo → Groq → HistorialMensaje. El modelo no escribe mensajes; Groq no calcula scores.
+Hay tres capas: **IA predictiva** (scikit-learn / RandomForestClassifier), **IA generativa** (Groq) y **Analítica** (consultas PostgreSQL y React/Recharts). La tercera interpreta riesgo, estrategias, comunicaciones, pagos y snapshots; no es un tercer modelo de IA ni prueba causalidad de recuperación.
+
+```text
+PostgreSQL (deudas + pagos) → seis features → Random Forest local
+  → probabilidad, score y segmento en Cliente
+  ├─ Evaluar cartera: termina en el riesgo, sin Groq ni comunicaciones
+  └─ Generación individual solicitada: contexto mínimo → Groq → HistorialMensaje
+Registros operativos + riesgo + snapshots → Analítica integrada
+```
+
+El bosque aprobado usa 12,000 historiales sintéticos y conserva 200 árboles, profundidad 6, mínimo 10 por hoja, clases balanceadas y semilla 42. AUC .8464, accuracy .7558, precision .6118, recall .8208 y F1 .7010 corresponden solo al test sintético, no a cartera empresarial real ni a un modelo calibrado/certificado para producción. La importancia relativa de pagos tardíos (~72.33%) y días de atraso (~22.58%) domina frente al saldo; no es atribución causal. Ver [Modelo ML](MODELO_ML.md) y [Decisiones técnicas](DECISIONES_TECNICAS.md).
 
 GET /api/clientes permite query por nombre (sin distinguir mayúsculas), ID y folio CL-000001, segmento, analizado, estatus_deuda y orden (prioridad/saldo/atraso/vencimiento/nombre). Los folios se derivan del ID, no requieren columna. Las deudas activas tienen saldo positivo. La cartera muestra el vencimiento activo más antiguo, para priorizar vencidas; los días se calculan desde la fecha actual del servidor. El detalle devuelve todas las deudas, pagos, la última estrategia y las comunicaciones del cliente, ordenadas por fecha e ID descendentes. Cada comunicación incluye canal, fecha, mensaje y estado. Los registros históricos marcados exitosos se conservan sin afirmar entrega verificada.
+
+`POST /api/cartera/evaluar` es una acción autenticada manual que obtiene clientes con deuda activa y procesa solo evaluaciones ausentes/incompletas. Reutiliza `recalcular_riesgo`; escribe únicamente `Cliente.probabilidad_pago_a_tiempo`, `score_riesgo` y `segmento`, sin tocar deudas/pagos ni generar estrategias o comunicaciones. No consulta Groq/Twilio/SendGrid ni depende de `COMMUNICATIONS_REAL_ENABLED`. Cada cliente se relee con `FOR UPDATE` y transacción propia: ante fallo se revierte ese cliente y continúa el lote. Los ya evaluados se omiten; no hay caducidad temporal por versión/fecha ni reevaluación forzada. Devuelve conteos y errores seguros; modelo ausente devuelve 503. [Contrato completo](EVALUAR_CARTERA.md).
+
+La acción de Cartera bloquea doble clic, informa carga/resultado y actualiza tabla, métricas y ficha abierta. La tabla muestra score, segmento y prioridad. Esta última sigue siendo `round((score_riesgo or 0) × saldo_pendiente, 2)`: **índice interno de ordenamiento, no dinero**, que combina riesgo estimado e impacto económico. El lote permite resolver prioridad cero por ausencia de evaluación cuando el usuario lo ejecuta y revisa los fallos.
 
 POST /api/deudas/{id}/pagos valida monto decimal positivo de hasta dos decimales, saldo y estado. La fecha es el día del servidor; no se aceptan fechas retroactivas. Bloquea primero Cliente y después Deuda con SELECT FOR UPDATE, registra Pago, actualiza saldo/estatus, hace flush y recalcula ML antes de commit. Todos los pagos de un cliente se serializan en PostgreSQL, aunque correspondan a distintas deudas. Cualquier error hace rollback. No hay reintento automático de pagos; ante una respuesta perdida consultar el historial antes de volver a enviar.
 
@@ -20,6 +34,12 @@ La tabla de cobranza usa GET /api/clientes?solo_con_deuda=true más sus filtros.
 Métricas: saldo vencido positivo por fecha o estatus; clientes con estrategia mediante COUNT DISTINCT; sin evaluar por segmento; deudores activos por saldo. Las claves anteriores se conservan y se agregan total_clientes, clientes_sin_evaluar y saldo_pendiente.
 
 app.migrate agrega columnas anulables sin eliminar registros. Se ejecuta explícitamente antes de desplegar; create_all no sustituye la migración. PostgreSQL usa bloqueo asesor transaccional para evitar dos migraciones simultáneas. Docker conserva el volumen postgres_data; Nginx sirve React y hace proxy /backend.
+
+## Base demo y evidencia
+
+El seed de entrega calcula los scores evaluados con el pipeline/modelo real después de cargar todo el historial ficticio. La base conserva 15 clientes, 23 deudas, 40 pagos, 24 estrategias, 24 comunicaciones simuladas, 15 snapshots y 0 administradores. 13 y 14 parten sin evaluar y 15 sin deuda; estrategias y snapshots son ficticios. No se usan scores manuales para los evaluados.
+
+La restauración PostgreSQL aislada y el backend comprobaron coherencia de scores y prioridad. En otra prueba aislada, Evaluar cartera encontró 14 activos, evaluó 2, omitió 12 y no tuvo fallos; dos solicitudes concurrentes no duplicaron las evaluaciones. Esto no certifica concurrencia de pagos/callbacks, carga empresarial ni entrega real. [QA](QA.md#validación-posterior-a-mejora-del-modelo) distingue estas ejecuciones de auditorías históricas.
 
 ## Comunicaciones opcionales
 

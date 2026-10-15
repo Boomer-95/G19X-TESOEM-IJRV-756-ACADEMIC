@@ -32,7 +32,7 @@ Ofrecer un flujo integrado de consulta, priorización y seguimiento de cobranza 
 
 ## 5. Objetivos específicos
 
-- Consultar cartera y fichas por nombre, ID o folio, con filtros y ordenamientos.
+- Analizar la cartera mediante indicadores globales de deuda, vencimiento, evaluación y riesgo, permitiendo consultar y priorizar posteriormente a cada cliente por nombre, ID o folio, con filtros y ordenamientos.
 - Mostrar saldos y vencimientos junto con el historial de pagos.
 - Estimar probabilidad de pago a tiempo, score y segmento mediante el modelo local existente.
 - Ordenar la atención por score de riesgo multiplicado por saldo pendiente.
@@ -68,7 +68,7 @@ La interfaz opera sobre clientes y deudas existentes. No ofrece altas, edición 
 | RF-03 | Buscar, filtrar y ordenar clientes | Nombre parcial, ID/folio, riesgo, evaluación, estado de deuda y cinco órdenes; cartera limitada a saldo activo. |
 | RF-04 | Consultar ficha | Resumen financiero, riesgo disponible, última estrategia, deudas, pagos y comunicaciones. Seleccionar no genera IA. |
 | RF-05 | Registrar pagos | Monto positivo, hasta dos decimales y sin sobrepago; fecha del servidor; actualiza saldo, historial y riesgo. |
-| RF-06 | Estimar riesgo | Modelo scikit-learn local. API independiente y cálculo dentro de generación/regeneración y pagos; sin botón independiente en React. |
+| RF-06 | Estimar riesgo | Modelo scikit-learn local. API individual, cálculo al generar/regenerar o registrar pagos y acción «Evaluar cartera» para activos pendientes (`POST /api/cartera/evaluar`), sin Groq ni estrategias en el lote. |
 | RF-07 | Priorizar cartera | Score × saldo, orden descendente por defecto; sin deuda activa se excluye de cartera. |
 | RF-08 | Generar/reutilizar/regenerar estrategia | Groq, conservación de historial y generación nueva explícita; sin plantilla de respaldo ante fallo. |
 | RF-09 | Consultar historial de estrategias | Por ID de cliente, con fecha, monto al momento y mensaje, recientes primero. |

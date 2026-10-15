@@ -2,7 +2,7 @@
 
 **Dirigido a:** evaluador académico y personal de cobranza autorizado.
 
-**Versión:** 1.0 · 6 de octubre de 2026.
+**Versión:** 1.1 · actualización documental del 15 de octubre de 2026.
 
 **Referencia:** interfaz y backend locales actuales.
 
@@ -38,7 +38,7 @@ Pulse **Resumen** en el menú. Las cinco tarjetas muestran datos globales, sin f
 | Clientes sin evaluar | Segmento No definido o nulo entre los clientes registrados. |
 | Recuperación | Porcentaje calculado desde monto original y saldo actual; no atribuye resultados a IA. |
 
-La pantalla carga estos datos al entrar y los vuelve a consultar tras pagos y procesamiento desde la ficha. Si hay error de consulta, no interprete los marcadores como valores financieros. No hay un botón general de refresco del Resumen; puede recargar la página con su sesión válida.
+La pantalla carga estos datos al entrar y los vuelve a consultar tras pagos, procesamiento desde la ficha y Evaluar cartera. Si hay error de consulta, no interprete los marcadores como valores financieros. No hay un botón general de refresco del Resumen; puede recargar la página con su sesión válida.
 
 ## 4. Operación de Cobranza
 
@@ -76,17 +76,39 @@ La selección muestra la información guardada; no inicia llamadas a Groq ni añ
 
 El vencimiento relevante de la ficha es el más antiguo entre las obligaciones activas. Los días se calculan usando la fecha del servidor. Un valor negativo de atraso en un pago indica que se pagó antes del vencimiento; una fecha ausente se muestra con un marcador. El detalle conserva datos históricos aunque no quede saldo activo.
 
-## 8. Calcular riesgo
+## 8. Calcular riesgo: individual o por cartera
 
-La ficha muestra **Probabilidad de pago a tiempo**, **Score de riesgo** y **Segmento** cuando existen. **Sin calcular** no significa bajo riesgo; **No aplica — sin deuda activa** significa que ya no hay obligación por priorizar.
+La ficha muestra **Probabilidad de pago a tiempo**, **Score de riesgo** y **Segmento** cuando existen. **Sin calcular** no significa bajo riesgo; **No aplica — sin deuda activa** significa que no hay obligación por priorizar.
 
-La interfaz actual no tiene un botón separado **Calcular riesgo**. Para el usuario:
+| Acción | Qué hace | Dependencias y límites |
+| --- | --- | --- |
+| **Procesar cliente** en la ficha, sin estrategia previa | Análisis individual: riesgo predictivo local y nueva estrategia generativa. | Usa scikit-learn y Groq; no envía comunicaciones. Si ya hay estrategia, el backend reutiliza la guardada sin nuevo cálculo ni llamada generativa por ese solo hecho. |
+| **Regenerar estrategia con IA** | Recalcula riesgo y solicita a Groq una nueva versión de texto. | Requiere Groq; conserva el historial y no comunica automáticamente. |
+| **Evaluar cartera** en Cartera | Solo evaluación predictiva por lote de clientes activos pendientes o con evaluación incompleta. | Usa scikit-learn local; **sin Groq, estrategia ni comunicaciones**. Omite evaluaciones completas. |
+| Registrar pago | Actualiza riesgo si queda deuda activa. | No regenera la estrategia. Si se liquida todo, riesgo no aplica. |
 
-1. Si no existe estrategia y hay deuda activa, pulse **Procesar cliente**: calcula riesgo y solicita una estrategia nueva.
-2. Si ya existe estrategia y necesita actualizarla, pulse **Regenerar estrategia con IA**: recalcula riesgo y guarda una nueva versión.
-3. Registrar un pago también recalcula riesgo cuando queda saldo activo, sin regenerar la estrategia.
+### Pasos para Evaluar cartera
 
-El backend dispone de una ruta independiente para scoring, destinada a integración técnica, no a una acción separada del menú. La generación necesita Groq; si falla, no suponga que el proceso completo se confirmó. Un cliente sin deuda no ejecuta ML ni Groq.
+1. Abra **Cartera**.
+2. Para revisar pendientes, seleccione **Análisis → Sin evaluar** y pulse **Buscar / filtrar**. Ese filtro identifica segmentos No definido/nulos; una evaluación parcialmente incompleta también puede ser procesada por el lote.
+3. Pulse **Evaluar cartera**. La acción considera todos los activos pendientes, no solo las filas visibles por los filtros. No requiere seleccionar fichas ni configurar Groq.
+4. Espere **Evaluando cartera...**. El botón se bloquea para impedir doble clic; no pulse acciones de generación para sustituir esta evaluación.
+5. Revise el resultado y los nuevos **Score**, **Segmento** y **Prioridad**. Cartera, Resumen y ficha abierta se refrescan. Si seguía filtrando Sin evaluar, los clientes evaluados desaparecerán de esa vista: quite el filtro y aplique **Orden → Mayor prioridad** para revisar el orden nuevo.
+6. Interprete los contadores:
+
+| Contador | Significado |
+| --- | --- |
+| Activos encontrados | Clientes con deuda de saldo positivo en la lectura inicial. |
+| Evaluados | Evaluaciones confirmadas y guardadas en esta ejecución. |
+| Ya evaluados omitidos | Tenían evaluación completa; no se recalcularon. |
+| No pudieron evaluarse | Fallaron al inferir o guardar; se informa su ID para revisión/reintento. |
+| Sin deuda al procesar, si aparece | Dejaron de tener saldo activo entre la lectura y su procesamiento; se omitieron. |
+
+Cada cliente tiene su propia transacción. Si uno falla, solo se revierte ese cliente; los éxitos anteriores permanecen guardados y el lote continúa. Puede reintentar: los evaluados se omitirán. Si se pierde la respuesta, consulte la cartera antes de interpretar el resultado. Si falla el refresco de vista, pulse **Actualizar**; no se repite automáticamente el POST.
+
+La función no modifica pagos, deudas, estrategias ni comunicaciones. El interruptor de envíos reales no afecta al cálculo. El modelo local debe estar disponible; si falta, se muestra error. No hay reevaluación forzada ni caducidad temporal por fecha/versión: “completa” no significa validada con datos nuevos. Véase [Evaluar cartera](EVALUAR_CARTERA.md).
+
+### Cómo interpretar el riesgo
 
 | Segmento | Score |
 | --- | --- |
@@ -94,7 +116,9 @@ El backend dispone de una ruta independiente para scoring, destinada a integraci
 | Riesgo medio | Desde 0.33 y menor que 0.66. |
 | Alto riesgo | Desde 0.66. |
 
-Score = 1 − probabilidad estimada de pago a tiempo, redondeado a tres decimales. El modelo usa historial y saldo; fue entrenado con datos sintéticos y no ofrece una probabilidad empresarial calibrada. Los scores precargados de la demo son ficticios y pueden cambiar al recalcularlos.
+Score = 1 − probabilidad estimada de pago a tiempo, redondeado a tres decimales. El Random Forest de scikit-learn utiliza seis features y fue reentrenado con 12,000 historiales sintéticos. El comportamiento previo tiene mayor influencia que el saldo. No hay validación empresarial real, calibración ni certificación para producción; el riesgo requiere revisión humana. El vencimiento actual no es una feature directa y sin historial se usan supuestos.
+
+Los scores precargados de los clientes evaluados de la demo provienen del pipeline real aplicado a datos ficticios; ya no se escriben manualmente. 13 y 14 parten sin evaluar y 15 sin deuda. No se garantiza que registrar un pago reduzca el riesgo. La ruta individual `/ia/calcular-riesgo/{cliente_id}` también existe para integración técnica.
 
 ## 9. Generar o regenerar estrategia IA
 
@@ -195,7 +219,7 @@ Los callbacks deben llegar con firma válida y configuración correcta. Sin esa 
 
 Abra **Cartera**. Por defecto muestra mayor prioridad primero: **score de riesgo × saldo pendiente**. Puede ordenar por **Mayor saldo**, **Mayor atraso**, **Vencimiento más próximo** o **Nombre**, aplicando **Buscar / filtrar**.
 
-Un saldo mayor puede elevar la prioridad aunque el segmento sea medio. Un cliente sin riesgo calculado puede tener prioridad cero: revise el filtro **Sin evaluar**, porque cero no significa buen pagador. La tabla muestra deudas activas y permite consultar la ficha; no elige un canal ni ejecuta acciones de cobranza por sí sola. **Actualizar** vuelve a consultar la cartera con los filtros aplicados.
+La prioridad es un **índice interno de ordenamiento, no dinero**: combina riesgo estimado e impacto económico. Un saldo mayor puede elevarla aunque el segmento sea medio. Un cliente sin riesgo calculado puede tener prioridad cero: revise el filtro **Sin evaluar** y pulse **Evaluar cartera**, porque cero no significa buen pagador. La acción requiere iniciarse manualmente y revisar los posibles fallos. La tabla muestra deudas activas y permite consultar la ficha; no elige un canal ni ejecuta acciones de cobranza por sí sola. **Actualizar** vuelve a consultar la cartera con los filtros aplicados.
 
 ## 19. Analítica IA
 
@@ -264,17 +288,19 @@ Esta es una configuración del backend, no un control del formulario. Para evalu
 1. Use exclusivamente una base demo separada restaurada desde [db/base-de-datos.sql](../db/base-de-datos.sql), nunca cartera operativa.
 2. Consulte ID 1 para una ficha con estrategia histórica, ID 13 o 14 para un cliente sin evaluar y ID 15 para uno liquidado. Son referencias del conjunto demo original; pagos o generaciones posteriores pueden cambiar los estados.
 3. Revise Resumen, Cartera, historiales y Analítica antes de cambiar datos. El SQL original contiene 15 clientes, 23 deudas, 40 pagos, 24 estrategias, 24 simulaciones y 15 snapshots, con fecha base 2026-10-06.
-4. Confirme **Modo: Simulado** antes de cada registro. Email/WhatsApp con texto guardado permiten recorrer comunicaciones sin adaptación Groq; generar/regenerar o usar SMS/Llamada sí puede llamar a Groq.
-5. Use un pago parcial pequeño que no exceda el saldo y revise el historial; esto modifica únicamente la base demo. Para repetir el estado inicial, pida una nueva base vacía al responsable, sin borrar ni sobrescribir datos operativos.
-6. Consulte Analítica y pulse **Actualizar datos**. Espere asociación IA cero porque las comunicaciones son simuladas.
-7. Cierre sesión al terminar.
+4. Pulse **Evaluar cartera** para probar 13 y 14 sin Groq: sobre la copia verificada hubo 14 activos, 2 evaluados, 12 omitidos y 0 fallidos. El 13 quedó con probabilidad .720, score .280, Bajo riesgo y prioridad 5208.00; el 14 con .953, .047, Bajo riesgo y 697.95. El 15 sigue sin deuda ni score.
+5. Confirme **Modo: Simulado** antes de cada registro. Email/WhatsApp con texto guardado permiten recorrer comunicaciones sin adaptación Groq; generar/regenerar o usar SMS/Llamada sí puede llamar a Groq.
+6. Use un pago parcial pequeño que no exceda el saldo y revise el historial; esto modifica únicamente la base demo. Para repetir el estado inicial, pida una nueva base vacía al responsable, sin borrar ni sobrescribir datos operativos.
+7. Consulte Analítica y pulse **Actualizar datos**. Espere asociación IA cero porque las comunicaciones son simuladas.
+8. Cierre sesión al terminar.
 
-Los nombres, scores, estrategias y snapshots precargados son ficticios; correos usan un dominio reservado no entregable y teléfonos son nulos. La demo no contiene credenciales ni crea usuarios Microsoft. **Las credenciales de prueba se entregan por el canal privado definido por TODO Academy.**
+Los nombres, historiales, estrategias y snapshots son ficticios; los scores de clientes evaluados son inferencias reales del modelo sobre ese historial sintético, no valores manuales; correos usan un dominio reservado no entregable y teléfonos son nulos. La demo no contiene credenciales ni crea usuarios Microsoft. **Las credenciales de prueba se entregan por el canal privado definido por TODO Academy.**
 
 ## Problemas frecuentes y límites
 
 | Situación | Acción recomendada |
 | --- | --- |
+| Cliente sin evaluar o con prioridad 0 | Revise el score y ejecute **Evaluar cartera**; cero por ausencia de cálculo no significa bajo riesgo. |
 | Cliente no aparece en Cartera | Quite filtros; si está liquidado, consulte por ID en Operación. |
 | Estrategia antigua tras pago | Revise fecha/saldo; regenere explícitamente si necesita texto nuevo y Groq está disponible. |
 | Error de IA o de adaptación SMS | No suponga que hubo registro/envío; consulte historial y solicite revisión técnica. No habilite proveedores reales. |

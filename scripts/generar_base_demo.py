@@ -39,6 +39,8 @@ def generar(fecha, binarios):
         candidato = carpeta / 'base-de-datos.sql'
         pg('pg_dump', *conexion, '-d', 'motor_cobranza_entrega_tmp', '--format=plain',
            '--no-owner', '--no-privileges', '-f', candidato)
+        # Normalizar el final antes de restaurar exactamente el SQL a publicar.
+        candidato.write_bytes(candidato.read_bytes().rstrip(b'\n') + b'\n')
         pg('createdb', *conexion, 'motor_cobranza_validacion_tmp')
         pg('psql', *conexion, '-X', '-v', 'ON_ERROR_STOP=1', '--single-transaction',
            '-d', 'motor_cobranza_validacion_tmp', '-f', candidato, stdout=subprocess.DEVNULL)

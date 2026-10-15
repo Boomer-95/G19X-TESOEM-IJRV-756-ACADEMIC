@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vXQb89OokQ7lP1X0wuSPxZuvyMshGZYap0NFTqEFzaWNtz10lJdXyZp3s2OV8z9
+\restrict zlMtCIHWsM7RF3HAjRrrwYhWZEkHA9JBryfJkhfUefsVSeZCGeSKCqe6zVFxMWX
 
 -- Dumped from database version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
@@ -335,21 +335,21 @@ COPY public.administradores (id, username, hashed_password, nombre_completo, act
 --
 
 COPY public.clientes (id, nombre, email, telefono, score_riesgo, probabilidad_pago_a_tiempo, segmento) FROM stdin;
-1	Cliente Ficticio Demo 01	cliente01@example.invalid	\N	0.15	0.85	Bajo riesgo
-2	Cliente Ficticio Demo 02	cliente02@example.invalid	\N	0.48	0.52	Riesgo medio
-3	Cliente Ficticio Demo 03	cliente03@example.invalid	\N	0.82	0.18	Alto riesgo
-4	Cliente Ficticio Demo 04	cliente04@example.invalid	\N	0.15	0.85	Bajo riesgo
-5	Cliente Ficticio Demo 05	cliente05@example.invalid	\N	0.48	0.52	Riesgo medio
-6	Cliente Ficticio Demo 06	cliente06@example.invalid	\N	0.82	0.18	Alto riesgo
-7	Cliente Ficticio Demo 07	cliente07@example.invalid	\N	0.15	0.85	Bajo riesgo
-8	Cliente Ficticio Demo 08	cliente08@example.invalid	\N	0.48	0.52	Riesgo medio
-9	Cliente Ficticio Demo 09	cliente09@example.invalid	\N	0.82	0.18	Alto riesgo
-10	Cliente Ficticio Demo 10	cliente10@example.invalid	\N	0.15	0.85	Bajo riesgo
-11	Cliente Ficticio Demo 11	cliente11@example.invalid	\N	0.48	0.52	Riesgo medio
-12	Cliente Ficticio Demo 12	cliente12@example.invalid	\N	0.82	0.18	Alto riesgo
 13	Cliente Ficticio Demo 13	cliente13@example.invalid	\N	\N	\N	No definido
 14	Cliente Ficticio Demo 14	cliente14@example.invalid	\N	\N	\N	No definido
 15	Cliente Ficticio Demo 15	cliente15@example.invalid	\N	\N	\N	Sin deuda
+1	Cliente Ficticio Demo 01	cliente01@example.invalid	\N	0.045	0.955	Bajo riesgo
+2	Cliente Ficticio Demo 02	cliente02@example.invalid	\N	0.255	0.745	Bajo riesgo
+3	Cliente Ficticio Demo 03	cliente03@example.invalid	\N	0.859	0.141	Alto riesgo
+4	Cliente Ficticio Demo 04	cliente04@example.invalid	\N	0.321	0.679	Bajo riesgo
+5	Cliente Ficticio Demo 05	cliente05@example.invalid	\N	0.481	0.519	Riesgo medio
+6	Cliente Ficticio Demo 06	cliente06@example.invalid	\N	0.832	0.168	Alto riesgo
+7	Cliente Ficticio Demo 07	cliente07@example.invalid	\N	0.055	0.945	Bajo riesgo
+8	Cliente Ficticio Demo 08	cliente08@example.invalid	\N	0.241	0.759	Bajo riesgo
+9	Cliente Ficticio Demo 09	cliente09@example.invalid	\N	0.281	0.719	Bajo riesgo
+10	Cliente Ficticio Demo 10	cliente10@example.invalid	\N	0.899	0.101	Alto riesgo
+11	Cliente Ficticio Demo 11	cliente11@example.invalid	\N	0.286	0.714	Bajo riesgo
+12	Cliente Ficticio Demo 12	cliente12@example.invalid	\N	0.9	0.1	Alto riesgo
 \.
 
 
@@ -390,18 +390,6 @@ COPY public.comunicaciones (id, cliente_id, estrategia_id, canal, fecha_envio, m
 --
 
 COPY public.deudas (id, cliente_id, monto_total, saldo_pendiente, fecha_vencimiento, estatus, probabilidad_pago) FROM stdin;
-1	1	4200	4200	2026-09-15	En Mora	0.85
-2	2	5400	4050	2027-04-06	Pendiente	0.52
-3	3	6600	6600	2026-09-13	En Mora	0.18
-4	4	7800	5850	2026-09-12	En Mora	0.85
-5	5	9000	9000	2027-04-09	Pendiente	0.52
-6	6	10200	7650	2026-09-10	En Mora	0.18
-7	7	11400	11400	2026-09-09	En Mora	0.85
-8	8	12600	9450	2027-04-12	Pendiente	0.52
-9	9	13800	13800	2026-09-07	En Mora	0.18
-10	10	15000	11250	2026-09-06	En Mora	0.85
-11	11	16200	16200	2027-04-15	Pendiente	0.52
-12	12	17400	13050	2026-09-04	En Mora	0.18
 13	13	18600	18600	2026-09-03	En Mora	\N
 14	14	19800	14850	2027-04-18	Pendiente	\N
 15	15	21000	0	2026-09-01	Pagada	\N
@@ -413,6 +401,18 @@ COPY public.deudas (id, cliente_id, monto_total, saldo_pendiente, fecha_vencimie
 21	6	8800	0	2026-08-01	Pagada	\N
 22	7	9600	0	2026-07-31	Pagada	\N
 23	8	10400	0	2026-07-30	Pagada	\N
+1	1	4200	4200	2026-09-15	En Mora	0.955
+2	2	5400	4050	2027-04-06	Pendiente	0.745
+3	3	6600	6600	2026-09-13	En Mora	0.141
+4	4	7800	5850	2026-09-12	En Mora	0.679
+5	5	9000	9000	2027-04-09	Pendiente	0.519
+6	6	10200	7650	2026-09-10	En Mora	0.168
+7	7	11400	11400	2026-09-09	En Mora	0.945
+8	8	12600	9450	2027-04-12	Pendiente	0.759
+9	9	13800	13800	2026-09-07	En Mora	0.719
+10	10	15000	11250	2026-09-06	En Mora	0.101
+11	11	16200	16200	2027-04-15	Pendiente	0.714
+12	12	17400	13050	2026-09-04	En Mora	0.1
 \.
 
 
@@ -767,4 +767,4 @@ ALTER TABLE ONLY public.pagos
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vXQb89OokQ7lP1X0wuSPxZuvyMshGZYap0NFTqEFzaWNtz10lJdXyZp3s2OV8z9
+\unrestrict zlMtCIHWsM7RF3HAjRrrwYhWZEkHA9JBryfJkhfUefsVSeZCGeSKCqe6zVFxMWX

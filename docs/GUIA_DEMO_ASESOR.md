@@ -20,7 +20,7 @@ Complete `.env` localmente, sin publicar sus valores:
 - `VITE_ENTRA_API_SCOPE`: exactamente `api://<CLIENT_ID>/access_as_user`, sustituyendo `<CLIENT_ID>` por `ENTRA_CLIENT_ID`.
 - `VITE_ENTRA_REDIRECT_URI`: exactamente `http://localhost:8080/`. Esta URI debe estar registrada como redirect SPA en Microsoft Entra. El script comprueba el valor local; no consulta el tenant.
 - `COMMUNICATIONS_REAL_ENABLED=false`: obligatorio. No configure Twilio ni SendGrid para esta demo.
-- `GROQ_API_KEY`: solo si se necesita generar nuevas estrategias o adaptar SMS/llamadas; recibirla privadamente. Sin ella se pueden consultar los datos y estrategias históricas; las operaciones que requieren IA muestran servicio no configurado.
+- `GROQ_API_KEY`: no es necesaria para **Evaluar cartera**; solo si se necesita generar nuevas estrategias o adaptar SMS/llamadas; recibirla privadamente. Sin ella se pueden consultar los datos y estrategias históricas; las operaciones que requieren IA muestran servicio no configurado.
 
 Para separar el volumen de otra instalación, añada a este `.env` nuevo un `COMPOSE_PROJECT_NAME` exclusivo, por ejemplo `motor-cobranza-demo-asesor`. No cambie el nombre de proyecto de una instalación operativa existente. Los puertos 8000 y 8080 deben estar libres. Docker construye la conexión usando el servicio `db`; no hace falta configurar `DATABASE_URL` para estos comandos.
 
@@ -44,10 +44,22 @@ chmod +x scripts/restaurar_demo.sh scripts/deploy_demo.sh
 | historial_mensajes | 24 |
 | comunicaciones | 24 |
 | metricas_snapshots | 15 |
+| administradores | 0 |
 
 `deploy_demo.sh` valida la configuración antes de compilar, espera PostgreSQL, construye backend/frontend, detiene backend y **siempre ejecuta `python -m app.migrate`** antes de arrancar los servicios. Si la migración falla, no continúa al arranque. La migración es aditiva e idempotente. El backend comprueba tablas y columnas antes de aceptar tráfico; ante un esquema incompleto aborta e indica ejecutar la migración.
 
 Abra **http://localhost:8080/** e inicie sesión con la cuenta Microsoft entregada. Documentación de API: http://127.0.0.1:8000/docs; las rutas de negocio requieren autenticación.
+
+## Evaluación predictiva sin proveedores
+
+Los 12 clientes precargados como evaluados tienen scores obtenidos del pipeline local sobre historiales ficticios, sin valores manuales. 13 y 14 quedan inicialmente sin evaluar; 15 está liquidado y sin score.
+
+1. Abra Cartera y revise Sin evaluar.
+2. Pulse **Evaluar cartera** y espere la confirmación: en la copia PostgreSQL verificada hubo **14 activos, 2 evaluados, 12 omitidos y 0 fallidos**.
+3. Quite el filtro de pendientes para revisar el orden. El 13 pasó a probabilidad .720, score .280, Bajo riesgo y prioridad 5208.00; el 14 a .953, .047, Bajo riesgo y 697.95. El 15 permanece fuera de cartera activa.
+4. Confirme que no aumentaron estrategias ni comunicaciones. No se necesita Groq ni credenciales Twilio/SendGrid. Conservar `COMMUNICATIONS_REAL_ENABLED=false` sigue siendo la política de demo para las otras acciones.
+
+Cada cliente se confirma por separado; un fallo revierte ese cliente y el lote continúa. La prioridad score × saldo es un índice interno de ordenamiento, no dinero; combina riesgo estimado e impacto económico. Estas acciones sí cambian los campos de riesgo de la copia conectada: usar únicamente la demo. Los resultados del modelo son sintéticos, no están calibrados ni certificados para producción. [Pasos y contadores](MANUAL_USUARIO.md#8-calcular-riesgo-individual-o-por-cartera).
 
 ## Conservación de la demo
 

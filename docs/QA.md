@@ -2,7 +2,7 @@
 
 ## Suite de referencia verificada
 
-La última verificación anterior a los ajustes de auditoría externa aprobó **388 tests backend y 36 tests frontend**. Estos son los resultados de referencia actuales; las cifras de las secciones siguientes describen verificaciones históricas y no deben interpretarse como el total vigente.
+Una verificación de referencia anterior a los ajustes de auditoría externa aprobó **388 tests backend y 36 tests frontend**. Se conserva como evidencia histórica, no como total vigente ni como ejecución de esta revisión documental. Las secciones anteriores a **Validación posterior a mejora del modelo** corresponden a fases históricas distintas; sus decisiones de no modificar modelo/frontend o sus límites de pruebas aplican solo a aquella fase.
 
 Las mejoras de esta revisión añaden cobertura del ErrorBoundary raíz y de diagnóstico seguro de restauración. El total posterior se obtiene ejecutando las suites, sin reutilizar ni inventar cifras. Los tests de backend usan bases aisladas y proveedores mockeados; no se ejecuta la restauración sobre PostgreSQL operativo.
 
@@ -42,7 +42,7 @@ npm run build
 
 Las fixtures deshabilitan dotenv y usan SQLite en memoria, tokens Entra firmados con RSA efímera, discovery/JWKS y Groq mockeados. No leen .env, no acceden a PostgreSQL real ni hacen llamadas al proveedor. Se conserva cobertura de autenticación Entra, comunicación simulada y modelo existente.
 
-Se prueban falta de configuración Groq (503), fallo/respuesta vacía (502, sin historial ni fallback), contexto mínimo, generación, reutilización, regeneración, invalidación tras pago y COUNT DISTINCT. Búsqueda por nombre/ID/folio, filtros, clientes sin evaluar, detalle y fechas pasadas/futuras. Pagos parciales/totales, sobrepago, montos inválidos, deuda inexistente, estatus, saldo, historial, features posteriores al pago, persistencia ML y rollback sin modelo. Migración aditiva repetida y seeds idempotentes, incluyendo cliente heredado.
+Se prueban falta de configuración Groq (503), fallo/respuesta vacía (502, sin historial ni fallback), contexto mínimo, generación, reutilización, regeneración, conservación de la estrategia tras pago y COUNT DISTINCT. Las referencias antiguas a invalidación no describen el comportamiento actual: una nueva estrategia requiere regeneración explícita. Búsqueda por nombre/ID/folio, filtros, clientes sin evaluar, detalle y fechas pasadas/futuras. Pagos parciales/totales, sobrepago, montos inválidos, deuda inexistente, estatus, saldo, historial, features posteriores al pago, persistencia ML y rollback sin modelo. Migración aditiva repetida y seeds idempotentes, incluyendo cliente heredado.
 
 Docker: `docker compose config --quiet` valida sin imprimir secretos expandidos; `docker compose build backend frontend` construye sin modificar volúmenes. No ejecutar comandos para eliminar volúmenes.
 
@@ -169,3 +169,32 @@ Los mocks de SDK y script verifican igualdad del prompt compartido y todas las r
 Validación: 269 pruebas Python y 2 pruebas de componente aprobadas (271 total), compileall app/scripts y git diff --check correctos, con una advertencia heredada Starlette/AnyIO. Frontend no modificado en esta actualización.
 
 Una sola petición aislada a Groq, sin comunicaciones/base/Twilio: Qwen 3.8, reasoning_effort=none, finish_reason=stop, content_length=42, completion_tokens=18, reasoning_length/reasoning_tokens ausentes. La revisión manual del archivo ficticio comprobó que la salida solo conserva pago MXN 500 y vencimiento 10 de octubre; no agregó recargos, intereses, penalizaciones ni otros hechos. Pasó normalización SMS <=150. Se puede repetir la prueba integrada únicamente en modo simulado, tras reconstruir backend. Sin envíos, commit ni push.
+
+
+## Validación posterior a mejora del modelo
+
+Registro de **ejecuciones distintas ya realizadas**, según la evidencia de cada fase. No son una única suite, no deben sumarse ni presentarse como el total actual. En esta actualización final solo se revisan documentos; no se ejecutan nuevamente entrenamiento, tests funcionales ni bases de datos.
+
+| Fase | Evidencia disponible | Alcance y límites |
+| --- | --- | --- |
+| Mejora del modelo predictivo | **147 tests relacionados aprobados**: riesgo, API, operaciones y analítica. | Validación de perfiles, probabilidades, segmentos y contrato score = 1 − probabilidad; sin cartera empresarial real. |
+| Coherencia de la base demo | **140 tests distintos aprobados**: 118 de seed/API/operaciones/analítica/esquema y 22 de scripts demo. | El seed calcula con el pipeline real; se restauró el SQL y contrastó el backend en PostgreSQL nuevo y aislado. No es una ejecución única de 140 ni validación operativa. |
+| Evaluar cartera | **133 tests backend + 43 frontend distintos aprobados**. | Incluye 13/14 en copia aislada, omisión de evaluados/liquidado, rollback individual, fallos de persistencia y salidas inválidas; frontend prueba doble clic/carga/resumen/refresco. Los 43 incluyen una ejecución adicional de la prueba de refresco vigente. |
+| Interfaz y herramientas de Evaluar cartera | **Lint aprobado y build aprobado**. | Build con advertencia de bundle Vite >500 kB; backend con advertencia heredada Starlette/AnyIO. No certifica layout o login real en navegador. |
+| PostgreSQL de Evaluar cartera | **Prueba aislada aprobada**, incluida concurrencia de dos lotes. | 14 activos, 2 evaluados, 12 ya evaluados omitidos, 0 fallidos; solo cambiaron campos de riesgo de 13/14. Ninguna otra tabla cambió. No certifica concurrencia de pagos/callbacks/snapshots ni escala empresarial. |
+
+El modelo aprobado usa RandomForestClassifier con seis features y 12,000 historiales sintéticos, semilla 42 y separación estratificada 80/20. Test sintético: **ROC AUC .8464, accuracy .7558, precision .6118, recall .8208, F1 .7010**. Clase positiva: pago a tiempo. Importancia relativa del bosque: pct_pagos_tarde ~72.33%, promedio_dias_atraso ~22.58%; no son porcentajes causales. No hay validación empresarial real, calibración ni certificación para producción. Detalle y comparación histórica: [Modelo ML](MODELO_ML.md) y [Auditoría del modelo](AUDITORIA_MODELO_ML.md).
+
+La demo conserva 15 clientes, 23 deudas, 40 pagos, 24 estrategias ficticias, 24 comunicaciones simuladas, 15 snapshots y 0 administradores. Los evaluados precargados usan inferencia real sobre historiales ficticios; 13/14 permanecen inicialmente sin evaluar y 15 sin deuda. No hay scores manuales entre los precargados evaluados.
+
+| Caso en PostgreSQL aislado | Antes | Después de Evaluar cartera |
+| --- | --- | --- |
+| CL-000013 | Probabilidad/score NULL; No definido; prioridad 0 | Probabilidad .720, score .280, Bajo riesgo, prioridad 5208.00 |
+| CL-000014 | Probabilidad/score NULL; No definido; prioridad 0 | Probabilidad .953, score .047, Bajo riesgo, prioridad 697.95 |
+| CL-000015 | Sin deuda; probabilidad/score NULL | Permanece igual y fuera de cartera activa |
+
+Se contrastaron las respuestas del backend y los valores persistidos directamente en PostgreSQL: 13 = .72/.28/Bajo riesgo y 14 = .953/.047/Bajo riesgo. El orden anterior era 12, 10, 6, 3, 11, 5, 9, 8, 4, 2, 7, 1, 13, 14; el posterior, 12, 10, 6, 3, 13, 11, 5, 9, 8, 4, 2, 14, 7, 1. La prioridad es un índice interno de ordenamiento, no dinero; conserva score × saldo y combina riesgo estimado e impacto económico.
+
+Las verificaciones de estas tres fases no hicieron llamadas a Groq/Twilio/SendGrid ni accedieron a la base operativa. La muestra real de Groq registrada en secciones históricas de SMS pertenece a otra fase y no debe atribuirse a estas validaciones. Entra se sustituyó solo en TestClient local para PostgreSQL; no se eludió en la aplicación. Los clústeres temporales quedaron detenidos. Evidencia y manejo transaccional: [Evaluar cartera](EVALUAR_CARTERA.md).
+
+Pendientes conservados: validación/calibración con datos reales, políticas empresariales y equidad; revisión E2E con Entra; cargas, concurrencia de otras operaciones y persistencia Docker; entrega y configuración reales de proveedores; seguimiento de dependencias. Recuperación asociada temporalmente a IA no demuestra causalidad.

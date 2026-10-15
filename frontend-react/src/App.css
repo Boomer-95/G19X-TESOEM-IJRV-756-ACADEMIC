@@ -277,3 +277,6 @@ tbody tr:hover { background: #f8fafd; }
   .grid-metricas, .panel-analitica .grid-metricas { grid-template-columns: minmax(0, 1fr); }
   .datos-cliente { gap: 0 12px; }
 }
+
+.evaluacion-cartera { margin: 16px 0; padding: 16px; border: 1px solid var(--border); background: var(--surface-alt); }
+.evaluacion-cartera p { margin: 8px 0 0; font-size: 12px; }

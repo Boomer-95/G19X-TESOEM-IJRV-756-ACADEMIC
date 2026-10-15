@@ -28,6 +28,24 @@ def preparar_entorno(url):
     os.environ['COMMUNICATIONS_REAL_ENABLED'] = 'false'
 
 
+def evaluar_clientes_demo(db, clientes):
+    """Inferencia de producción después de persistir TODO el historial ficticio."""
+    from app.main import recalcular_riesgo
+    db.flush()  # SessionLocal tiene autoflush=False; no evaluar datos incompletos.
+    for posicion, cliente in enumerate(clientes, 1):
+        if posicion in (13, 14):
+            # Casos deliberadamente pendientes de evaluación, nunca riesgo bajo.
+            cliente.score_riesgo = cliente.probabilidad_pago_a_tiempo = None
+            cliente.segmento = 'No definido'
+        else:
+            # Incluye el liquidado: el pipeline devuelve NULL y "Sin deuda".
+            recalcular_riesgo(db, cliente)
+        for deuda in cliente.deudas:
+            deuda.probabilidad_pago = (cliente.probabilidad_pago_a_tiempo
+                                      if deuda.saldo_pendiente > 0 else None)
+    db.flush()
+
+
 def poblar(url, hoy):
     preparar_entorno(url)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -44,20 +62,14 @@ def poblar(url, hoy):
     with SessionLocal.begin() as db:
         clientes, deudas, pagos, estrategias = [], [], [], []
         for i in range(1, 16):
-            score = None if i >= 13 else [0.15, 0.48, 0.82][(i - 1) % 3]
-            segmento = 'No definido' if score is None else ('Bajo riesgo' if score < .33 else 'Riesgo medio' if score < .66 else 'Alto riesgo')
             c = m.Cliente(nombre=f'Cliente Ficticio Demo {i:02d}',
                           email=f'cliente{i:02d}@example.invalid', telefono=None,
-                          score_riesgo=score, probabilidad_pago_a_tiempo=None if score is None else round(1 - score, 3),
-                          segmento='Sin deuda' if i == 15 else segmento)
-            if i == 15:
-                c.score_riesgo = c.probabilidad_pago_a_tiempo = None
+                          score_riesgo=None, probabilidad_pago_a_tiempo=None,
+                          segmento='Sin deuda' if i == 15 else 'No definido')
             db.add(c)
             db.flush()
             # El default ORM 0.0 sustituye None durante INSERT; restaurar NULL tras flush.
-            if i >= 13:
-                c.score_riesgo = None
-                c.probabilidad_pago_a_tiempo = None
+            c.score_riesgo = c.probabilidad_pago_a_tiempo = None
             clientes.append(c)
             total = float(3000 + i * 1200)
             abonado = total if i == 15 else total / 4 if i % 2 == 0 else 0
@@ -66,7 +78,7 @@ def poblar(url, hoy):
             d = m.Deuda(cliente_id=c.id, monto_total=total, saldo_pendiente=total - abonado,
                         fecha_vencimiento=vencimiento,
                         estatus='Pagada' if i == 15 else 'En Mora' if offset < 0 else 'Pendiente',
-                        probabilidad_pago=c.probabilidad_pago_a_tiempo)
+                        probabilidad_pago=None)
             db.add(d)
             db.flush()
             deudas.append(d)
@@ -94,6 +106,7 @@ def poblar(url, hoy):
                            dias_atraso=(fecha_pago - vencimiento).days, canal_contacto='Demo sintética', se_recuperó=True)
                 db.add(p)
                 pagos.append(p)
+        evaluar_clientes_demo(db, clientes)
         # Plantillas ficticias almacenadas: NO generadas llamando a Groq.
         for i, c in enumerate(clientes[:12], 1):
             for n in range(2):
@@ -113,11 +126,13 @@ def poblar(url, hoy):
         # Historial académico explícitamente inventado; último punto coincide con cartera y pagos.
         saldo = sum(d.saldo_pendiente for d in deudas)
         vencida = sum(d.saldo_pendiente for d in deudas if d.fecha_vencimiento < hoy)
+        from app.services.analitica import cartera_actual
+        cartera = cartera_actual(db)
         for hace in range(28, -1, -2):
             corte = hoy - timedelta(days=hace)
             db.add(m.MetricaSnapshot(fecha=corte, saldo_pendiente=saldo + hace * 700,
-                cartera_vencida=vencida + hace * 400, deudores_activos=14,
-                clientes_alto_riesgo=4, monto_recuperado=sum(p.monto for p in pagos if p.fecha_pago <= corte),
+                cartera_vencida=vencida + hace * 400, deudores_activos=cartera['deudores_activos'],
+                clientes_alto_riesgo=cartera['clientes_alto_riesgo'], monto_recuperado=sum(p.monto for p in pagos if p.fecha_pago <= corte),
                 clientes_con_estrategia_ia=len({h.cliente_id for h in estrategias if h.fecha_creacion.date() <= corte})))
     engine.dispose()
     print('Demo ficticia creada: 15 clientes, 23 deudas, 40 pagos, 24 estrategias, 24 comunicaciones, 15 snapshots; administradores vacíos.')

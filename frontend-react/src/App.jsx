@@ -1,4 +1,5 @@
 import Analitica from './Analitica';
+import EvaluarCartera from './EvaluarCartera';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import useNavegacionSecciones, { SECCIONES } from './useNavegacionSecciones';
@@ -224,6 +225,10 @@ function Dashboard({ nombreAdmin, handleLogout }) {
             </div>
             <button className="btn-secundario" onClick={cargarCartera} disabled={cargandoCartera}><Icono nombre="actualizar" />{cargandoCartera ? 'Actualizando...' : 'Actualizar'}</button>
           </div>
+          <EvaluarCartera alEvaluar={async () => {
+            await Promise.all([cargarCartera(), cargarMetricas(),
+              ...(clienteSeleccionado ? [refrescarDetalle(clienteSeleccionado.cliente_id)] : [])]);
+          }} />
           <form className="filtros-cartera" onSubmit={e => { e.preventDefault(); setBusqueda(new URLSearchParams(Object.entries(filtros).filter(([, v]) => v !== '')).toString()); }}>
             <label>Buscar cliente<input value={filtros.query} placeholder="Nombre, apellido, ID o folio" onChange={e => setFiltros({ ...filtros, query: e.target.value })} /></label>
             <label>Riesgo<select value={filtros.segmento} onChange={e => setFiltros({ ...filtros, segmento: e.target.value })}>
@@ -241,7 +246,7 @@ function Dashboard({ nombreAdmin, handleLogout }) {
           {cartera.length > 0 && (
             <div className="tabla-wrapper" tabIndex="0" role="region" aria-label="Cartera priorizada">
               <table className="tabla-cartera">
-                <thead><tr><th scope="col">Folio</th><th scope="col">Cliente</th><th scope="col" className="numero">Monto pendiente</th><th scope="col">Vencimiento</th><th scope="col" className="numero">Días</th><th scope="col">Segmento</th><th scope="col" className="numero">Prioridad</th></tr></thead>
+                <thead><tr><th scope="col">Folio</th><th scope="col">Cliente</th><th scope="col" className="numero">Monto pendiente</th><th scope="col">Vencimiento</th><th scope="col" className="numero">Días</th><th scope="col">Segmento</th><th scope="col" className="numero">Score</th><th scope="col" className="numero">Prioridad</th></tr></thead>
                 <tbody>
                   {cartera.map((c) => (
                     <tr key={c.cliente_id} className={`fila-cliente${seleccionado === c.cliente_id ? ' seleccionada' : ''}`} tabIndex={0} role="button" aria-label={`Seleccionar ${c.folio} · ${c.cliente_nombre}`}
@@ -257,6 +262,7 @@ function Dashboard({ nombreAdmin, handleLogout }) {
                       <td className="numero">${c.monto_pendiente.toLocaleString('es-MX')}</td>
                       <td>{fechaVisible(c.fecha_vencimiento)}</td><td className="numero">{diasVisible(c.dias_restantes)}</td>
                       <td><BadgeSegmento segmento={c.segmento} /></td>
+                      <td className="numero">{c.score_riesgo == null ? 'Sin calcular' : c.score_riesgo.toFixed(3)}</td>
                       <td className="numero">{c.prioridad.toLocaleString('es-MX')}</td>
                     </tr>
                   ))}

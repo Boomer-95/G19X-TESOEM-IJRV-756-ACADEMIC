@@ -1,0 +1,161 @@
+{
+  "antes_dataset_original": {
+    "auc": 0.6282904614152738,
+    "accuracy": 0.605,
+    "precision": 0.6121495327102804,
+    "recall": 0.6359223300970874,
+    "f1": 0.6238095238095238,
+    "segments": [
+      32,
+      322,
+      46
+    ],
+    "importance": {
+      "pct_pagos_tarde": 0.17676570237782932,
+      "promedio_dias_atraso": 0.1568096589627737,
+      "num_pagos_historicos": 0.1266802037983329,
+      "monto_promedio_pago": 0.15848573059563326,
+      "monto_pendiente_actual": 0.27825800758515645,
+      "num_deudas_activas": 0.10300069668027438
+    }
+  },
+  "despues_holdout": {
+    "roc_auc": 0.846443785539404,
+    "accuracy": 0.7558333333333334,
+    "precision": 0.6117542297417632,
+    "recall": 0.8207885304659498,
+    "f1": 0.7010204081632653,
+    "segmentos": {
+      "Bajo": 704,
+      "Medio": 536,
+      "Alto": 1160
+    },
+    "importancias": {
+      "pct_pagos_tarde": 0.7232608636674218,
+      "promedio_dias_atraso": 0.22577957362159362,
+      "num_pagos_historicos": 0.014653796308198904,
+      "monto_promedio_pago": 0.01575979874258308,
+      "monto_pendiente_actual": 0.01409774271883782,
+      "num_deudas_activas": 0.0064482249413648305
+    }
+  },
+  "comparacion_misma_muestra_nueva": {
+    "antes": {
+      "roc_auc": 0.687357662373888,
+      "accuracy": 0.6785,
+      "precision": 0.547886393659181,
+      "recall": 0.47332382310984306,
+      "f1": 0.5078830552579213,
+      "segmentos": {
+        "Bajo": 208,
+        "Medio": 6796,
+        "Alto": 2996
+      },
+      "importancias": {
+        "pct_pagos_tarde": 0.17676570237782932,
+        "promedio_dias_atraso": 0.1568096589627737,
+        "num_pagos_historicos": 0.1266802037983329,
+        "monto_promedio_pago": 0.15848573059563326,
+        "monto_pendiente_actual": 0.27825800758515645,
+        "num_deudas_activas": 0.10300069668027438
+      }
+    },
+    "despues": {
+      "roc_auc": 0.8468112088855797,
+      "accuracy": 0.759,
+      "precision": 0.6176660219213411,
+      "recall": 0.8199714693295292,
+      "f1": 0.7045844569747487,
+      "segmentos": {
+        "Bajo": 2844,
+        "Medio": 2347,
+        "Alto": 4809
+      },
+      "importancias": {
+        "pct_pagos_tarde": 0.7232608636674218,
+        "promedio_dias_atraso": 0.22577957362159362,
+        "num_pagos_historicos": 0.014653796308198904,
+        "monto_promedio_pago": 0.01575979874258308,
+        "monto_pendiente_actual": 0.01409774271883782,
+        "num_deudas_activas": 0.0064482249413648305
+      }
+    }
+  },
+  "perfiles": [
+    {
+      "nombre": "Buen pagador",
+      "features": {
+        "pct_pagos_tarde": 0,
+        "promedio_dias_atraso": 0,
+        "num_pagos_historicos": 24,
+        "monto_promedio_pago": 3000,
+        "monto_pendiente_actual": 10000,
+        "num_deudas_activas": 2
+      },
+      "probabilidad": 0.933,
+      "score": 0.067,
+      "segmento": "Bajo",
+      "score_antes": 0.311
+    },
+    {
+      "nombre": "Ocasionalmente tardío",
+      "features": {
+        "pct_pagos_tarde": 0.25,
+        "promedio_dias_atraso": 5,
+        "num_pagos_historicos": 24,
+        "monto_promedio_pago": 3000,
+        "monto_pendiente_actual": 10000,
+        "num_deudas_activas": 2
+      },
+      "probabilidad": 0.747,
+      "score": 0.253,
+      "segmento": "Bajo",
+      "score_antes": 0.37
+    },
+    {
+      "nombre": "Muy tardío",
+      "features": {
+        "pct_pagos_tarde": 1,
+        "promedio_dias_atraso": 30,
+        "num_pagos_historicos": 24,
+        "monto_promedio_pago": 3000,
+        "monto_pendiente_actual": 10000,
+        "num_deudas_activas": 2
+      },
+      "probabilidad": 0.125,
+      "score": 0.875,
+      "segmento": "Alto",
+      "score_antes": 0.524
+    },
+    {
+      "nombre": "Saldo pequeño, mal comportamiento",
+      "features": {
+        "pct_pagos_tarde": 1,
+        "promedio_dias_atraso": 30,
+        "num_pagos_historicos": 24,
+        "monto_promedio_pago": 3000,
+        "monto_pendiente_actual": 500,
+        "num_deudas_activas": 2
+      },
+      "probabilidad": 0.147,
+      "score": 0.853,
+      "segmento": "Alto",
+      "score_antes": 0.532
+    },
+    {
+      "nombre": "Saldo grande, buen comportamiento",
+      "features": {
+        "pct_pagos_tarde": 0,
+        "promedio_dias_atraso": 0,
+        "num_pagos_historicos": 24,
+        "monto_promedio_pago": 3000,
+        "monto_pendiente_actual": 60000,
+        "num_deudas_activas": 2
+      },
+      "probabilidad": 0.932,
+      "score": 0.068,
+      "segmento": "Bajo",
+      "score_antes": 0.478
+    }
+  ]
+}

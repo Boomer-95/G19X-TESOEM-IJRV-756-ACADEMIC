@@ -2,6 +2,7 @@ import os
 import json
 import hashlib
 import logging
+import math
 from decimal import Decimal
 from contextlib import asynccontextmanager
 from datetime import date
@@ -142,6 +143,56 @@ def resumen_cliente(c):
             "prioridad": round((c.score_riesgo or 0) * saldo, 2),
             "fecha_vencimiento": fecha,
             "dias_restantes": (fecha - date.today()).days if fecha else None}
+
+
+def evaluacion_riesgo_completa(cliente):
+    """Vigencia disponible sin timestamps/versionado: campos completos y válidos."""
+    p, score = cliente.probabilidad_pago_a_tiempo, cliente.score_riesgo
+    return (p is not None and score is not None
+            and math.isfinite(p) and math.isfinite(score)
+            and 0 <= p <= 1 and 0 <= score <= 1
+            and abs(p + score - 1) <= .001
+            and cliente.segmento in ("Bajo riesgo", "Riesgo medio", "Alto riesgo"))
+
+
+@app.post("/api/cartera/evaluar")
+def evaluar_cartera(db: Session = Depends(get_db),
+                    user: dict = Depends(auth.get_entra_user)):
+    """Solo riesgo local. Cada cliente confirma o revierte su propia transacción."""
+    if _modelo_riesgo is None:
+        raise HTTPException(503, "El modelo predictivo local no está disponible.")
+    ids = [id_ for (id_,) in db.query(models.Cliente.id).filter(
+        models.Cliente.deudas.any(models.Deuda.saldo_pendiente > 0)
+    ).order_by(models.Cliente.id).all()]
+    db.rollback()  # Termina la lectura inicial; ninguna escritura se hizo aún.
+    resumen = {"clientes_activos_encontrados": len(ids), "clientes_evaluados": 0,
+               "clientes_ya_evaluados_omitidos": 0, "clientes_fallidos": 0,
+               "clientes_sin_deuda_omitidos": 0, "errores": []}
+    for cliente_id in ids:
+        try:
+            with db.begin():
+                # Mismo bloqueo de cliente que pagos y evaluación individual.
+                # Releer bajo bloqueo impide reevaluar por dos lotes simultáneos.
+                cliente = db.query(models.Cliente).options(selectinload(models.Cliente.deudas)).filter_by(
+                    id=cliente_id).populate_existing().with_for_update().first()
+                if cliente is None or not any(d.saldo_pendiente > 0 for d in cliente.deudas):
+                    resultado = "clientes_sin_deuda_omitidos"
+                elif evaluacion_riesgo_completa(cliente):
+                    resultado = "clientes_ya_evaluados_omitidos"
+                else:
+                    recalcular_riesgo(db, cliente)
+                    if not evaluacion_riesgo_completa(cliente):
+                        raise ValueError("Salida predictiva inválida")
+                    resultado = "clientes_evaluados"
+            # Contar solo después de confirmar la transacción, incluido flush.
+            resumen[resultado] += 1
+        except Exception as error:
+            db.rollback()
+            logger.warning("No se pudo evaluar el cliente %s (%s)", cliente_id, type(error).__name__)
+            resumen["clientes_fallidos"] += 1
+            resumen["errores"].append({"cliente_id": cliente_id,
+                                      "motivo": "No se pudo guardar una evaluación predictiva válida."})
+    return resumen
 
 
 @app.post("/ia/calcular-riesgo/{cliente_id}")

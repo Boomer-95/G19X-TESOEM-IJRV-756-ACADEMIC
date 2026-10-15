@@ -43,6 +43,7 @@ Las rutas de negocio requieren un access token Microsoft Entra en `Authorization
 | GET | `/api/cartera-priorizada` | Clientes con deuda activa, por riesgo × saldo descendente |
 | POST | `/api/deudas/{deuda_id}/pagos` | JSON con `monto`; registra pago y actualiza saldo/riesgo |
 | POST | `/ia/calcular-riesgo/{cliente_id}` | Calcula y guarda probabilidad, score y segmento |
+| POST | `/api/cartera/evaluar` | Evalúa activos pendientes con el modelo local; omite evaluaciones completas, sin Groq ni estrategias |
 | POST | `/ia/analizar-riesgo/{cliente_id}` | Genera o reutiliza estrategia; `?regenerar=true` solicita otra |
 | GET | `/ia/historial/{cliente_id}` | Estrategias recientes primero; 404 cuando no hay historial |
 | GET | `/api/integraciones/estado` | Disponibilidad efectiva booleana de los canales, sin consultar proveedores |
@@ -100,7 +101,7 @@ python -m pip install -r requirements-dev.txt
 test -e .env || cp .env.example .env
 ```
 
-Completar las variables de PostgreSQL, Entra y Groq localmente. En una base existente respaldar antes de cualquier migración y detener escrituras concurrentes durante el despliegue:
+Completar PostgreSQL y Entra localmente; Groq es necesario únicamente si se generarán estrategias o adaptaciones, no para Evaluar cartera. En una base existente respaldar antes de cualquier migración y detener escrituras concurrentes durante el despliegue:
 
 ```bash
 python -m app.migrate
@@ -183,7 +184,7 @@ Son diez columnas posibles, más índices en `pagos.deuda_id`, `comunicaciones.e
 
 ## Cartera, métricas y pagos
 
-Buscar por ID, folio o nombre parcial; filtrar por riesgo/análisis/estado de deuda y ordenar por prioridad, saldo, atraso, vencimiento o nombre. La prioridad usa score × saldo activo. Seleccionar una fila consulta la ficha y no genera automáticamente una estrategia.
+Buscar por ID, folio o nombre parcial; filtrar por riesgo/análisis/estado de deuda y ordenar por prioridad, saldo, atraso, vencimiento o nombre. La prioridad usa score × saldo activo: es un índice interno de ordenamiento, no dinero; combina riesgo estimado e impacto económico. Seleccionar una fila consulta la ficha y no genera automáticamente una estrategia.
 
 Métricas consultadas en BD:
 
@@ -195,11 +196,19 @@ Métricas consultadas en BD:
 
 Los pagos validan monto positivo con dos decimales, no permiten exceder el saldo y bloquean cliente/deuda en la transacción PostgreSQL. Actualizan saldo, historial y riesgo; la liquidación deja deuda pagada y excluye al cliente de cartera activa. Fecha del pago: día actual del servidor. Un fallo revierte toda la operación. No hay claves de idempotencia distribuidas: no reenviar un pago cuyo resultado sea incierto sin consultar primero el historial.
 
-## Riesgo y Groq
+### Evaluar cartera
+
+En **Cartera**, **Evaluar cartera** calcula únicamente riesgo predictivo local para clientes activos pendientes o con evaluación incompleta. No recalcula por defecto evaluaciones completas. Reutiliza `recalcular_riesgo` y guarda `probabilidad_pago_a_tiempo`, `score_riesgo` y `segmento` en Cliente; no modifica deuda ni pagos, no genera estrategias ni comunicaciones y no llama a Groq, Twilio o SendGrid. No requiere `GROQ_API_KEY` ni depende de `COMMUNICATIONS_REAL_ENABLED`.
+
+Cada cliente confirma su propia transacción; si falla, se revierte solo ese cliente y continúa el lote. Devuelve activos encontrados, evaluados, ya evaluados omitidos y fallidos, con IDs de errores; contempla aparte clientes que dejaron de tener deuda al procesarlos. El botón bloquea doble clic, muestra carga y resultados, y refresca tabla, métricas y ficha abierta. La tabla muestra score, segmento y prioridad. Es una acción manual, no una tarea programada: permite resolver prioridad cero por falta de evaluación, pero hay que ejecutarla y revisar fallos. Sin fecha/versión de evaluación no existe caducidad temporal ni “reevaluar todos”. Véase [Evaluar cartera](docs/EVALUAR_CARTERA.md).
+
+## Riesgo, Groq y analítica
+
+Son tres capas: **IA predictiva** con scikit-learn/Random Forest; **IA generativa** con Groq para texto; **Analítica** con React/Recharts y consultas de riesgo, estrategias, comunicaciones, pagos y snapshots. Analítica no es un tercer modelo de IA ni prueba que la recuperación sea causada por IA. Las sustituciones respecto a tecnologías previstas se explican en [Decisiones técnicas](docs/DECISIONES_TECNICAS.md).
 
 Las features exactas son `pct_pagos_tarde`, `promedio_dias_atraso`, `num_pagos_historicos`, `monto_promedio_pago`, `monto_pendiente_actual` y `num_deudas_activas`. Se consideran pagos con `dias_atraso` conocido y obligaciones con saldo positivo. Sin historial se usan supuestos heredados; el modelo no incluye directamente la fecha de vencimiento actual. El contexto enviado a Groq sí incluye vencimientos, pagos recientes, saldo y riesgo; excluye teléfono, email y credenciales.
 
-Random Forest combina 200 árboles para estimar pago a tiempo; `score_riesgo = round(1 - probabilidad_pago_a_tiempo, 3)`. Alto riesgo desde 0.66, riesgo medio desde 0.33 y bajo por debajo de 0.33. El script de entrenamiento genera 2,000 observaciones sintéticas y usa una división estratificada 80%/20%. Sus métricas de precision, recall, F1 y AUC-ROC **no acreditan precisión ni probabilidad calibrada en una cartera real**.
+Random Forest combina 200 árboles para estimar pago a tiempo; `score_riesgo = round(1 - probabilidad_pago_a_tiempo, 3)`. Alto riesgo desde 0.66, riesgo medio desde 0.33 y bajo por debajo de 0.33. El modelo aprobado fue reentrenado con 12,000 historiales sintéticos, con división estratificada 80%/20% y semilla 42. En el test sintético: ROC AUC **0.8464**, accuracy **0.7558**, precision **0.6118**, recall **0.8208** y F1 **0.7010**, para pago a tiempo como clase positiva. El porcentaje de pagos tardíos aporta aproximadamente 72.33% de importancia y los días de atraso 22.58%; el saldo ya no domina. Son importancias relativas del Random Forest, no porcentajes causales del riesgo. **Estas métricas son exclusivamente sintéticas: no acreditan rendimiento empresarial real ni calibración o certificación para producción.**
 
 Sin deuda activa no se ejecuta ML ni Groq y riesgo/probabilidad no aplican. No se reentrena ni altera arbitrariamente el modelo. Los valores sin historial son supuestos, no neutralidad demostrada. Antes de uso operativo se requiere evaluación temporal con datos reales autorizados, calibración y revisión de equidad; ver [MODELO_ML.md](docs/MODELO_ML.md). Los pagos sintéticos sirven para demostrar features y no reducen el saldo ni prueban recuperación real.
 
@@ -327,6 +336,8 @@ git diff --check
 
 Backend usa SQLite temporal, tokens RSA de prueba, SDK/JWKS simulados, configuración externa eliminada y conexiones externas bloqueadas. No utiliza la BD de desarrollo ni realiza envíos. Frontend prueba componentes/helpers y el transporte autenticado con mocks. No sustituyen pruebas del navegador, concurrencia PostgreSQL o entrega real.
 
+La evidencia posterior incluye ejecuciones distintas: 147 tests relacionados con el modelo, 140 tests distintos de coherencia demo y 133 backend + 43 frontend de Evaluar cartera, además de lint/build y pruebas PostgreSQL aisladas aprobadas. No se suman como una suite única ni se ejecutaron nuevamente en esta revisión documental; véase [QA](docs/QA.md#validación-posterior-a-mejora-del-modelo).
+
 GitHub Actions ya ejecuta tests/compilación/check de backend, tests/lint/build de frontend y compilación de ambas imágenes. Su ejecución remota queda pendiente hasta que el usuario decida guardar y publicar los cambios.
 
 ## Limitaciones y cierre del MVP
@@ -371,7 +382,7 @@ docker exec -i plurione-demo-db psql -U postgres -X -v ON_ERROR_STOP=1 \
 
 Para usar la demo en el dashboard, configurar el backend de demostración por separado apuntando a la nueva base; no sobrescribir el `.env` ni recrear los servicios operativos. `DB_HOST`, cuando está definido, tiene prioridad sobre `DATABASE_URL`. **`COMMUNICATIONS_REAL_ENABLED=false` debe permanecer así durante toda la demostración.** Los accesos Microsoft se proporcionan por separado: el SQL no crea cuentas Entra ni contiene contraseñas de acceso. Las consultas locales de validación sustituyen Entra únicamente en un TestClient aislado; no prueban el login Microsoft.
 
-Los scores, estrategias y snapshots son datos inventados para ilustrar la interfaz, no resultados de una evaluación real ni llamadas a Groq. Todos los pagos tienen deuda asociada y los saldos concilian con sus importes. Las comunicaciones son exclusivamente simuladas: efectividad por canal muestra simulaciones, pero cero envíos reales, entregas y recuperación atribuida a IA, conforme a las reglas actuales. El dump usa fechas fijas con fecha base **2026-10-06**; con el paso del tiempo los vencimientos y filtros de periodo cambian. `/api/analitica/evolucion` actualiza el snapshot de hoy, únicamente en la base demo conectada.
+Los clientes y sus historiales son ficticios; los scores de los 12 clientes precargados como evaluados se obtienen con el mismo pipeline y modelo local de producción, sin scores manuales. Los clientes **13 y 14 quedan inicialmente sin evaluar** (probabilidad/score NULL y segmento No definido); el **15 queda sin deuda**, con riesgo no aplicable. Las estrategias son plantillas históricas ficticias, no llamadas acreditadas a Groq, y los snapshots son demostrativos. Esto no constituye validación sobre cartera empresarial real. Todos los pagos tienen deuda asociada y los saldos concilian con sus importes. Las comunicaciones son exclusivamente simuladas: efectividad por canal muestra simulaciones, pero cero envíos reales, entregas y recuperación atribuida a IA, conforme a las reglas actuales. El dump usa fechas fijas con fecha base **2026-10-06**; con el paso del tiempo los vencimientos y filtros de periodo cambian. `/api/analitica/evolucion` actualiza el snapshot de hoy, únicamente en la base demo conectada.
 
 ### Regenerar y verificar la entrega
 
@@ -385,6 +396,6 @@ venv/bin/python scripts/generar_base_demo.py --fecha-base AAAA-MM-DD
 venv/bin/python scripts/generar_base_demo.py --pg-bin /ruta/a/postgresql/16/bin
 ```
 
-El generador inicializa un clúster nuevo en `/tmp/motor-entrega-*`, sin TCP, crea `motor_cobranza_entrega_tmp`, aplica los modelos y las migraciones locales actuales, y ejecuta `scripts/seed_entrega.py`. Este seed rechaza conexiones ajenas al socket temporal y bases que ya tengan tablas. Exporta con `pg_dump --format=plain --no-owner --no-privileges`, importa **solo el SQL** en otra base vacía (`motor_cobranza_validacion_tmp`) y verifica esquema, relaciones, índices, secuencias, conteos, conciliación de saldos y contenido sensible. Después consulta métricas, clientes, cartera y analítica con TestClient, bloqueando conexiones externas. No ejecuta seeds adicionales, envíos ni entrenamiento del modelo. Solo copia el SQL final a `db/base-de-datos.sql` si todas las comprobaciones pasan.
+El generador inicializa un clúster nuevo en `/tmp/motor-entrega-*`, sin TCP, crea `motor_cobranza_entrega_tmp`, aplica los modelos y las migraciones locales actuales, y ejecuta `scripts/seed_entrega.py`. Este seed rechaza conexiones ajenas al socket temporal y bases que ya tengan tablas. Exporta con `pg_dump --format=plain --no-owner --no-privileges`, importa **solo el SQL** en otra base vacía (`motor_cobranza_validacion_tmp`) y verifica esquema, relaciones, índices, secuencias, conteos, conciliación de saldos y contenido sensible. Después contrasta los scores del SQL y del backend con la inferencia real, verifica prioridades y casos bajo/medio/alto/sin evaluar/sin deuda y consulta métricas, clientes, cartera y analítica con TestClient, bloqueando conexiones externas. Los efectos de validación de snapshots se revierten para conservar los conteos del dump. No ejecuta seeds adicionales, envíos ni entrenamiento del modelo. Solo copia el SQL final a `db/base-de-datos.sql` si todas las comprobaciones pasan.
 
 El clúster temporal se detiene al finalizar y su ruta se informa para inspección; no borra bases ni volúmenes existentes. La regeneración reproduce el esquema y los datos para una misma fecha base; cabeceras y marcadores internos de `pg_dump` pueden variar. No ejecutar estos scripts en producción.

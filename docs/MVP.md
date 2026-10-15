@@ -33,7 +33,7 @@ La automatización se limita a cálculos, generación/adaptación, solicitudes a
 | Ejecución y calidad | Docker/Nginx y GitHub Actions con tests, lint y builds, sin despliegue automático. |
 | Entrega académica | SQL plano demo y scripts de generación/importación/validación aisladas. |
 
-No existe botón de scoring independiente en el frontend. La API `/ia/calcular-riesgo/{cliente_id}` sí existe; en la interfaz el cálculo ocurre dentro de generación/regeneración o después del pago. Reutilizar una estrategia guardada no solicita una nueva ni recalcula por ese solo hecho.
+Existe la acción **Evaluar cartera** (`POST /api/cartera/evaluar`) para scoring local por lote de activos pendientes, sin Groq, estrategias ni comunicaciones. La API individual `/ia/calcular-riesgo/{cliente_id}` se conserva; en la interfaz también se calcula al generar/regenerar o después del pago. Reutilizar una estrategia guardada no solicita una nueva ni recalcula por ese solo hecho.
 
 ## Qué no incluye
 
