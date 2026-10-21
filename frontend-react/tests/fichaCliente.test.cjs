@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { transformSync } = require('esbuild');
 
-function render(recomendacion) {
+function render(recomendacion, canalSugerido) {
   const llamadas = [];
   const react = {
     useState: value => [value, () => {}],
@@ -20,7 +20,7 @@ function render(recomendacion) {
   const tree = module.exports.default({ detalle: {
     cliente_id: 1, folio: 'CL-000001', cliente_nombre: 'Prueba', monto_pendiente: 2000,
     monto_original_total: 2000, deudas: [], pagos: [], comunicaciones: [],
-    recomendacion_recuperacion: recomendacion,
+    recomendacion_recuperacion: recomendacion, canal_sugerido: canalSugerido,
   } });
   return { tree, llamadas };
 }
@@ -46,3 +46,26 @@ for (const humana of [true, false]) {
 test('ficha tolera una API sin recomendación', () => {
   assert.match(texto(render(null).tree), /Recomendación no disponible/);
 });
+
+for (const fuente of ['real', 'simulada', 'mixta']) {
+  test(`canal sugerido, confianza y fuente ${fuente} visibles sin solicitudes`, () => {
+    const { tree, llamadas } = render(null, { canal: 'WhatsApp', confianza: 'media',
+      motivo: 'Existe 1 pago asociado temporalmente dentro de los siguientes 7 días.', fuente_evidencia: fuente });
+    const contenido = texto(tree);
+    assert.match(contenido, /Canal sugerido:.*WhatsApp/);
+    assert.match(contenido, /Confianza de evidencia:.*media/);
+    assert.match(contenido, /pago asociado temporalmente/);
+    assert.match(contenido, /Esta asociación es observacional y no demuestra que el canal haya causado el pago/);
+    if (fuente === 'simulada') assert.match(contenido, /Sugerencia basada en datos de demostración\/simulados/);
+    if (fuente === 'mixta') assert.match(contenido, /evidencia mixta: datos reales y de demostración\/simulados/);
+    assert.equal(llamadas.length, 0);
+  });
+}
+for (const canal of [undefined, { canal: null, estado: 'Sin evidencia suficiente', confianza: 'insuficiente', motivo: 'Faltan contactos.' }]) {
+  test(`canal insuficiente o backend anterior: ${canal === undefined ? 'ausente' : 'insuficiente'}`, () => {
+    const contenido = texto(render(null, canal).tree);
+    assert.match(contenido, /Canal sugerido:.*Sin evidencia suficiente/);
+    assert.match(contenido, /Confianza de evidencia:.*insuficiente/);
+    assert.match(contenido, /Esta asociación es observacional y no demuestra que el canal haya causado el pago/);
+  });
+}

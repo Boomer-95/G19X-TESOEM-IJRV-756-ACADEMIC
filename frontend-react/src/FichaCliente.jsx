@@ -71,6 +71,14 @@ export default function FichaCliente({ detalle, alActualizar, alRefrescar }) {
         <p className="texto-secundario">No modifica la deuda ni autoriza condiciones financieras. No reemplaza la decisión humana.</p>
       </> : <p>Recomendación no disponible.</p>}
     </section>
+    <section className="estrategia-cliente" aria-label="Canal sugerido">
+      <h4>Canal sugerido: {detalle.canal_sugerido?.canal || 'Sin evidencia suficiente'}</h4>
+      <p>Confianza de evidencia: {detalle.canal_sugerido?.confianza || 'insuficiente'}</p>
+      <p>{detalle.canal_sugerido?.motivo || 'No hay una sugerencia disponible para este cliente.'}</p>
+      {detalle.canal_sugerido?.fuente_evidencia === 'simulada' && <p>Sugerencia basada en datos de demostración/simulados.</p>}
+      {detalle.canal_sugerido?.fuente_evidencia === 'mixta' && <p>Sugerencia basada en evidencia mixta: datos reales y de demostración/simulados.</p>}
+      <p className="texto-secundario">Esta asociación es observacional y no demuestra que el canal haya causado el pago.</p>
+    </section>
     {confirmacion && <p role="status">{confirmacion}</p>}
     <div className="estrategia-cliente">{detalle.sin_deuda_activa ? <p>El cliente no tiene obligaciones pendientes. No se requiere estrategia de cobranza.</p> : <>
       {detalle.ultima_estrategia ? <>
