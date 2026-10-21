@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zlMtCIHWsM7RF3HAjRrrwYhWZEkHA9JBryfJkhfUefsVSeZCGeSKCqe6zVFxMWX
+\restrict 4B4RsQsRcHhiHwTFupFYYpnDc1NmsSJ1GPSf2reXyfuiUSeaCIvnimBcgkcndjC
 
 -- Dumped from database version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
@@ -358,12 +358,12 @@ COPY public.clientes (id, nombre, email, telefono, score_riesgo, probabilidad_pa
 --
 
 COPY public.comunicaciones (id, cliente_id, estrategia_id, canal, fecha_envio, mensaje, exitoso, modo, estado, provider, external_id, error_tecnico, provider_status) FROM stdin;
-1	1	1	Email	2026-09-13	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
-2	1	2	SMS	2026-09-11	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
-3	2	3	SMS	2026-09-14	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
-4	2	4	WhatsApp	2026-09-12	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
-5	3	5	WhatsApp	2026-09-15	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
-6	3	6	Email	2026-09-13	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
+1	1	1	SMS	2026-08-01	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
+2	1	2	SMS	2026-08-02	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
+3	2	3	WhatsApp	2026-08-08	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
+4	2	4	WhatsApp	2026-08-09	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
+5	3	5	Email	2026-08-20	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
+6	3	6	Email	2026-08-21	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
 7	4	7	Email	2026-09-16	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
 8	4	8	SMS	2026-09-14	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
 9	5	9	SMS	2026-09-17	[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.	f	simulado	Simulado	\N	\N	\N	\N
@@ -421,12 +421,12 @@ COPY public.deudas (id, cliente_id, monto_total, saldo_pendiente, fecha_vencimie
 --
 
 COPY public.historial_mensajes (id, cliente_id, contexto_hash, monto_al_momento, mensaje_generado, fecha_creacion) FROM stdin;
-1	1	\N	4200	[DEMO FICTICIA] Estrategia 1 para Cliente Ficticio Demo 01: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-09-13 06:00:00-06
-2	1	\N	4200	[DEMO FICTICIA] Estrategia 2 para Cliente Ficticio Demo 01: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-09-11 06:00:00-06
-3	2	\N	5400	[DEMO FICTICIA] Estrategia 1 para Cliente Ficticio Demo 02: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-09-14 06:00:00-06
-4	2	\N	5400	[DEMO FICTICIA] Estrategia 2 para Cliente Ficticio Demo 02: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-09-12 06:00:00-06
-5	3	\N	6600	[DEMO FICTICIA] Estrategia 1 para Cliente Ficticio Demo 03: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-09-15 06:00:00-06
-6	3	\N	6600	[DEMO FICTICIA] Estrategia 2 para Cliente Ficticio Demo 03: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-09-13 06:00:00-06
+1	1	\N	4200	[DEMO FICTICIA] Estrategia 1 para Cliente Ficticio Demo 01: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-08-01 06:00:00-06
+2	1	\N	4200	[DEMO FICTICIA] Estrategia 2 para Cliente Ficticio Demo 01: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-08-02 06:00:00-06
+3	2	\N	5400	[DEMO FICTICIA] Estrategia 1 para Cliente Ficticio Demo 02: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-08-08 06:00:00-06
+4	2	\N	5400	[DEMO FICTICIA] Estrategia 2 para Cliente Ficticio Demo 02: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-08-09 06:00:00-06
+5	3	\N	6600	[DEMO FICTICIA] Estrategia 1 para Cliente Ficticio Demo 03: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-08-20 06:00:00-06
+6	3	\N	6600	[DEMO FICTICIA] Estrategia 2 para Cliente Ficticio Demo 03: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-08-21 06:00:00-06
 7	4	\N	7800	[DEMO FICTICIA] Estrategia 1 para Cliente Ficticio Demo 04: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-09-16 06:00:00-06
 8	4	\N	7800	[DEMO FICTICIA] Estrategia 2 para Cliente Ficticio Demo 04: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-09-14 06:00:00-06
 9	5	\N	9000	[DEMO FICTICIA] Estrategia 1 para Cliente Ficticio Demo 05: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.	2026-09-17 06:00:00-06
@@ -453,9 +453,9 @@ COPY public.historial_mensajes (id, cliente_id, contexto_hash, monto_al_momento,
 --
 
 COPY public.metricas_snapshots (id, fecha, saldo_pendiente, cartera_vencida, deudores_activos, clientes_alto_riesgo, monto_recuperado, clientes_con_estrategia_ia) FROM stdin;
-1	2026-09-08	165550.00	103600.00	14	4	60800.00	0
-2	2026-09-10	164150.00	102800.00	14	4	60800.00	0
-3	2026-09-12	162750.00	102000.00	14	4	60800.00	2
+1	2026-09-08	165550.00	103600.00	14	4	60800.00	3
+2	2026-09-10	164150.00	102800.00	14	4	60800.00	3
+3	2026-09-12	162750.00	102000.00	14	4	60800.00	3
 4	2026-09-14	161350.00	101200.00	14	4	60800.00	4
 5	2026-09-16	159950.00	100400.00	14	4	60800.00	6
 6	2026-09-18	158550.00	99600.00	14	4	60800.00	8
@@ -767,4 +767,4 @@ ALTER TABLE ONLY public.pagos
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zlMtCIHWsM7RF3HAjRrrwYhWZEkHA9JBryfJkhfUefsVSeZCGeSKCqe6zVFxMWX
+\unrestrict 4B4RsQsRcHhiHwTFupFYYpnDc1NmsSJ1GPSf2reXyfuiUSeaCIvnimBcgkcndjC

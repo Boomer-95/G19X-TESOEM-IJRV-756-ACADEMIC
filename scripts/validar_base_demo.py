@@ -81,6 +81,52 @@ def comprobar_inferencia_demo(db, cliente_http):
     return filas
 
 
+def comprobar_canales_demo(db, cliente_http, *, hoy=None):
+    """Escenarios sintéticos: regla aprobada intacta, sin escrituras ni envíos."""
+    from app import models
+    from app.services.canal_sugerido import sugerir_canal
+
+    filas = []
+    for c in db.query(models.Cliente).order_by(models.Cliente.id):
+        r = sugerir_canal(c, hoy=hoy)
+        assert r['ventana_pago_dias'] == 7
+        respuesta = cliente_http.get(f'/api/clientes/{c.id}')
+        assert respuesta.status_code == 200
+        # Comparar todos los campos tras serializar las fechas para JSON.
+        assert respuesta.json()['canal_sugerido'] == json.loads(json.dumps(r, default=str))
+        canal = r['canal']
+        datos = r['estadisticas'].get(canal, {})
+        if c.id in (1, 2, 3):
+            esperado = {1: 'SMS', 2: 'WhatsApp', 3: 'Email'}[c.id]
+            assert canal == esperado, c.id
+            assert r['fuente_evidencia'] == 'simulada' and r['confianza'] == 'baja'
+            assert datos['comunicaciones_evaluables'] == 2
+            assert datos['score_interno'] == 5
+            assert datos['pagos_asociados_temporalmente'] == 1
+            contactos = sorted(c.comunicaciones, key=lambda x: (x.fecha_envio, x.id))
+            assert len(contactos) == 2 and all(x.canal == esperado for x in contactos)
+            asociados = [p for p in c.pagos if p.fecha_pago is not None
+                         and 0 <= (p.fecha_pago - contactos[-1].fecha_envio).days <= 7]
+            assert len(asociados) == 1
+            assert contactos[0].fecha_envio < contactos[1].fecha_envio < asociados[0].fecha_pago
+            assert sum(d['pagos_asociados_temporalmente'] for d in r['estadisticas'].values()) == 1
+        else:
+            assert canal is None and r['estado'] == 'Sin evidencia suficiente', c.id
+            assert r['confianza'] == 'insuficiente'
+            assert r['fuente_evidencia'] == ('simulada' if c.id <= 12 else 'sin_datos')
+        for contacto in c.comunicaciones:
+            assert contacto.modo == 'simulado' and contacto.estado == 'Simulado'
+            assert contacto.exitoso is False
+            assert contacto.provider_status is None and contacto.provider is None
+        assert all(d['entregadas_o_leidas'] == d['leidas'] == d['fallidas_o_no_entregadas'] == 0
+                   for d in r['estadisticas'].values())
+        filas.append(dict(id=c.id, canal=canal, confianza=r['confianza'],
+                          fuente=r['fuente_evidencia'], score_ganador=datos.get('score_interno'),
+                          pagos_asociados=sum(d['pagos_asociados_temporalmente'] for d in r['estadisticas'].values())))
+    assert len(filas) == 15
+    return filas
+
+
 def validar(url, archivo):
     from sqlalchemy.engine import make_url
     destino = make_url(url)
@@ -171,6 +217,7 @@ def validar(url, archivo):
         cliente = TestClient(main.app)
         with SesionValidacion() as db:
             inferencias = comprobar_inferencia_demo(db, cliente)
+            canales_demo = comprobar_canales_demo(db, cliente)
         for ruta in rutas:
             respuesta = cliente.get(ruta)
             assert respuesta.status_code == 200, (ruta, respuesta.status_code)
@@ -196,7 +243,7 @@ def validar(url, archivo):
         assert conteos_finales == esperados, conteos_finales
     engine.dispose()
     print(json.dumps({'conteos_importados': conteos, 'comprobaciones': resultados,
-                      'conteos_tras_backend': conteos_finales, 'endpoints': estados, 'inferencia_y_prioridad': inferencias, 'seguridad_sql': 'OK'}, ensure_ascii=False, indent=2))
+                      'conteos_tras_backend': conteos_finales, 'endpoints': estados, 'inferencia_y_prioridad': inferencias, 'canales_sugeridos_demo': canales_demo, 'seguridad_sql': 'OK'}, ensure_ascii=False, indent=2))
 
 
 if __name__ == '__main__':

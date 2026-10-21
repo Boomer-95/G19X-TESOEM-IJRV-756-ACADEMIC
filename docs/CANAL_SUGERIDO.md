@@ -136,3 +136,49 @@ reemplaza la revisión del asesor. No decide condiciones financieras.
 El servicio y su GET solo leen objetos existentes; no escriben en PostgreSQL ni
 modifican pagos/comunicaciones. Los tests usan SQLite aislado, bloquean red y
 verifican que el GET solo ejecuta SELECT, sin ejecutar ML o proveedores.
+
+
+## Escenarios incluidos en el SQL de demostración
+
+Al regenerar/restaurar `db/base-de-datos.sql` con fecha base 2026-10-06:
+
+| Cliente ficticio | Canal sugerido | Confianza | Fuente | Score | Pagos asociados |
+| --- | --- | --- | --- | --- | --- |
+| 1 | SMS | baja | simulada | 5 | 1 |
+| 2 | WhatsApp | baja | simulada | 5 | 1 |
+| 3 | Email | baja | simulada | 5 | 1 |
+| 4–7, 9, 11 | Sin evidencia suficiente | insuficiente | simulada | — | 0 |
+| 8, 10, 12 | Sin evidencia suficiente | insuficiente | simulada | — | 1 |
+| 13–15 | Sin evidencia suficiente | insuficiente | sin_datos | — | 0 |
+
+Fechas exactas para la fecha base 2026-10-06:
+
+| Cliente | Comunicaciones (IDs y fechas) | Pago existente (ID y fecha) |
+| --- | --- | --- |
+| 1 | 1: 2026-08-01; 2: 2026-08-02 | 12: 2026-08-03 |
+| 2 | 3: 2026-08-08; 4: 2026-08-09 | 16: 2026-08-10 |
+| 3 | 5: 2026-08-20; 6: 2026-08-21 | 20: 2026-08-22 |
+
+Los clientes 8, 10 y 12 ya tienen un pago asociado temporalmente, pero sus dos
+contactos pertenecen a canales diferentes: ninguno alcanza el mínimo de dos
+comunicaciones en un mismo canal. Por eso conservan evidencia insuficiente.
+
+Se reutilizan los 24 contactos y los 40 pagos, sin incrementar conteos ni
+cambiar importes, saldos o pagos. Solo los seis contactos de los clientes 1–3
+se redistribuyen al canal indicado, en fechas situadas dos días y un día antes
+del último pago de su deuda histórica liquidada. Sus seis estrategias ficticias
+se fechan esos mismos días para conservar la cronología. Los demás contactos
+conservan su distribución original. El abono anterior es previo a ambos contactos;
+ningún contacto posterior de otro canal puede apropiarse del pago objetivo.
+El último contacto es el único al que se asocia el pago. Las simulaciones mantienen
+`estado=Simulado`, `exitoso=false` y proveedor/estado de proveedor nulos.
+
+Estos escenarios son datos sintéticos de demostración y no prueban preferencias
+reales de clientes ni causalidad entre comunicación y pago.
+
+El generador restaura el SQL en una PostgreSQL nueva aislada y ejecuta
+`scripts/validar_base_demo.py`: comprueba los conteos, los 15 resultados mediante
+la función aprobada y el GET de ficha, y que los tres canales positivos tienen
+exactamente un pago asociado y score 5. No cambia pesos, ventana ni mínimo de
+comunicaciones. La fecha base es configurable; los escenarios se desplazan juntos
+al regenerar. La visualización exige una fecha de referencia posterior a los datos.

@@ -107,19 +107,28 @@ def poblar(url, hoy):
                 db.add(p)
                 pagos.append(p)
         evaluar_clientes_demo(db, clientes)
+        # Reutilizar seis contactos (sin añadir pagos): dos del mismo canal,
+        # antes del último abono histórico y después del penúltimo. Así solo
+        # el último pago queda asociado y siempre al contacto más reciente.
+        canales_demo = {1: 'SMS', 2: 'WhatsApp', 3: 'Email'}
+        ultimos_pagos = {i: max(p.fecha_pago for p in pagos
+                               if p.cliente_id == i and p.deuda_id != deudas[i - 1].id)
+                        for i in canales_demo}
         # Plantillas ficticias almacenadas: NO generadas llamando a Groq.
         for i, c in enumerate(clientes[:12], 1):
             for n in range(2):
                 hace = 24 - i + n * 2
+                fecha_contacto = (ultimos_pagos[i] - timedelta(days=2 - n)
+                                  if i in canales_demo else hoy - timedelta(days=hace))
                 h = m.HistorialMensaje(cliente_id=c.id, contexto_hash=None,
                     monto_al_momento=deudas[i - 1].monto_total,
                     mensaje_generado=f'[DEMO FICTICIA] Estrategia {n + 1} para {c.nombre}: revisar saldo y acordar seguimiento respetuoso. Sin envío externo.',
-                    fecha_creacion=datetime.combine(hoy - timedelta(days=hace), time(12), tzinfo=timezone.utc))
+                    fecha_creacion=datetime.combine(fecha_contacto, time(12), tzinfo=timezone.utc))
                 db.add(h)
                 db.flush()
                 estrategias.append(h)
                 db.add(m.Comunicacion(cliente_id=c.id, estrategia_id=h.id,
-                    canal=['Email', 'SMS', 'WhatsApp'][((i - 1) + n) % 3],
+                    canal=canales_demo.get(i, ['Email', 'SMS', 'WhatsApp'][((i - 1) + n) % 3]),
                     fecha_envio=h.fecha_creacion.date(), mensaje='[DEMO FICTICIA] Recordatorio simulado de revisión de saldo.',
                     exitoso=False, modo='simulado', estado='Simulado', provider=None,
                     external_id=None, error_tecnico=None, provider_status=None))

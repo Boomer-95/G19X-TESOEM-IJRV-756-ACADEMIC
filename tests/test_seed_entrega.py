@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app import auth, database, main, models
 from scripts import seed_entrega
-from scripts.validar_base_demo import comprobar_inferencia_demo
+from scripts.validar_base_demo import comprobar_inferencia_demo, comprobar_canales_demo
 
 
 @pytest.fixture
@@ -140,3 +140,24 @@ def test_evaluar_cartera_demo_13_14(demo, monkeypatch):
     groq.assert_not_awaited()
     for funcion in externos:
         funcion.assert_not_called()
+
+
+def test_canales_demo_reproducibles_sin_duplicar_pago(demo):
+    db, cliente, _ = demo
+    filas = comprobar_canales_demo(db, cliente, hoy=date(2026, 10, 6))
+    assert [f['canal'] for f in filas[:3]] == ['SMS', 'WhatsApp', 'Email']
+    assert all(f['score_ganador'] == 5 and f['pagos_asociados'] == 1 for f in filas[:3])
+    assert all(f['canal'] is None for f in filas[3:])
+    # El contacto y su estrategia ficticia conservan fecha y cliente coherentes.
+    for c in db.query(models.Comunicacion):
+        assert c.estrategia.cliente_id == c.cliente_id
+        assert c.estrategia.fecha_creacion.date() == c.fecha_envio
+
+
+def test_validador_rechaza_escenario_canal_roto(demo):
+    db, cliente, _ = demo
+    contacto = db.query(models.Comunicacion).filter_by(cliente_id=1).first()
+    contacto.canal = 'Email'
+    db.commit()
+    with pytest.raises(AssertionError):
+        comprobar_canales_demo(db, cliente, hoy=date(2026, 10, 6))
