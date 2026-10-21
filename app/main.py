@@ -17,6 +17,7 @@ load_dotenv()
 
 from . import models, auth
 from .services import comunicaciones
+from .services.recomendacion import recomendar_cliente
 from .services.analitica import router as analitica_router, cartera_actual
 from .services.mensajes import adaptar_sms, extraer_adaptacion, AdaptacionInvalida, SMS_INSTRUCCION
 from .services.configuracion import estado_proveedores
@@ -316,6 +317,7 @@ def detalle_cliente(cliente_id: int, db: Session = Depends(get_db),
         raise HTTPException(404, "Cliente no encontrado")
     ultimo = db.query(models.HistorialMensaje).filter_by(cliente_id=c.id).order_by(models.HistorialMensaje.fecha_creacion.desc().nulls_last(), models.HistorialMensaje.id.desc()).first()
     return {**resumen_cliente(c), "email": c.email, "telefono": c.telefono,
+            "recomendacion_recuperacion": recomendar_cliente(c),
             "tiene_estrategia": ultimo is not None,
             "fecha_ultima_estrategia": ultimo.fecha_creacion if ultimo else None,
             "monto_original_total": sum(d.monto_total for d in c.deudas),

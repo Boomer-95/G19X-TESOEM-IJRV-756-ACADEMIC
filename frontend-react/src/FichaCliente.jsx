@@ -61,6 +61,16 @@ export default function FichaCliente({ detalle, alActualizar, alRefrescar }) {
       <div><dt>Score de riesgo</dt><dd>{detalle.sin_deuda_activa ? 'No aplica — sin deuda activa' : !detalle.segmento || detalle.segmento === 'No definido' ? 'Sin calcular' : detalle.score_riesgo ?? 'Sin calcular'}</dd></div>
       <div><dt>Segmento</dt><dd><span className={`badge-segmento ${detalle.sin_deuda_activa ? 'riesgo-indefinido' : {'Alto riesgo': 'riesgo-alto', 'Riesgo medio': 'riesgo-medio', 'Bajo riesgo': 'riesgo-bajo'}[detalle.segmento] || 'riesgo-indefinido'}`}>{detalle.sin_deuda_activa ? 'Sin deuda' : !detalle.segmento || detalle.segmento === 'No definido' ? 'Sin calcular' : detalle.segmento}</span></dd></div>
     </dl>
+    <section className="estrategia-cliente" aria-label="Recomendación de recuperación">
+      <h4>Recomendación de recuperación · regla de negocio MVP</h4>
+      {detalle.recomendacion_recuperacion ? <>
+        <p><strong>{detalle.recomendacion_recuperacion.tipo}</strong></p>
+        <p>{detalle.recomendacion_recuperacion.motivo}</p>
+        <p>Nivel de atención: {detalle.recomendacion_recuperacion.nivel_atencion}</p>
+        <p>{detalle.recomendacion_recuperacion.requiere_revision_humana ? 'Requiere revisión/autorización humana.' : 'No requiere revisión humana previa para el seguimiento sugerido.'}</p>
+        <p className="texto-secundario">No modifica la deuda ni autoriza condiciones financieras. No reemplaza la decisión humana.</p>
+      </> : <p>Recomendación no disponible.</p>}
+    </section>
     {confirmacion && <p role="status">{confirmacion}</p>}
     <div className="estrategia-cliente">{detalle.sin_deuda_activa ? <p>El cliente no tiene obligaciones pendientes. No se requiere estrategia de cobranza.</p> : <>
       {detalle.ultima_estrategia ? <>
