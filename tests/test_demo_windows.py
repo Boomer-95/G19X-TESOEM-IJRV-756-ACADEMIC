@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def entorno(tmp_path, monkeypatch):
     raiz = tmp_path / 'demo con espacios'
     (raiz / 'db').mkdir(parents=True)
-    (raiz / '.env').write_text('NO_EJECUTAR=texto\n')
+    (raiz / '.env').write_text('NO_EJECUTAR=texto\n', encoding="utf-8")
     sql = '-- SQL UTF-8 ficticio: revisión\nSELECT 1;\n'.encode()
     (raiz / 'db/base-de-datos.sql').write_bytes(sql)
     config = {'services': {
@@ -147,13 +147,13 @@ def test_falta_env_o_sql_no_inicia(entorno):
 @pytest.mark.parametrize('nombre,accion', [('restaurar_demo.ps1', 'restore'), ('deploy_demo.ps1', 'deploy')])
 def test_entradas_powershell_estructura_estatica(nombre, accion):
     # No sustituye un parser PowerShell ni una ejecución Windows.
-    texto = (ROOT / 'scripts' / nombre).read_text()
+    texto = (ROOT / 'scripts' / nombre).read_text(encoding="utf-8")
     assert '#Requires -Version 5.1' in texto
     assert ". (Join-Path $PSScriptRoot 'demo_windows.ps1')" in texto
     assert f'Invoke-DemoWindows -Accion {accion}' in texto
     assert 'Invoke-Expression' not in texto
     assert 'Get-Content' not in texto  # No pasar COPY SQL por pipeline de texto.
-    comun = (ROOT / 'scripts/demo_windows.ps1').read_text()
+    comun = (ROOT / 'scripts/demo_windows.ps1').read_text(encoding="utf-8")
     assert "@('py', 'python3', 'python')" in comun
     assert 'exit $LASTEXITCODE' in comun
     assert '$PSScriptRoot' in comun and 'demo_windows.py' in comun
@@ -161,7 +161,7 @@ def test_entradas_powershell_estructura_estatica(nombre, accion):
 
 
 def test_readme_corto_con_enlaces_y_referencia_preservada():
-    texto = (ROOT / 'README.md').read_text()
+    texto = (ROOT / 'README.md').read_text(encoding="utf-8")
     assert len(texto.splitlines()) < 80
     for nombre in ['PRD', 'MVP', 'ARQUITECTURA', 'MANUAL_USUARIO', 'MODELO_ML', 'ANALITICA_IA',
                    'DECISIONES_TECNICAS', 'GUIA_DEMO_ASESOR', 'RECOMENDACION_RECUPERACION', 'CANAL_SUGERIDO', 'QA']:
@@ -169,4 +169,4 @@ def test_readme_corto_con_enlaces_y_referencia_preservada():
     assert '.\\scripts\\restaurar_demo.ps1' in texto
     assert '.\\scripts\\deploy_demo.ps1' in texto
     assert 'Uso de asistentes de IA durante el desarrollo' in texto
-    assert len((ROOT / 'docs/REFERENCIA_TECNICA.md').read_text().splitlines()) > 350
+    assert len((ROOT / 'docs/REFERENCIA_TECNICA.md').read_text(encoding="utf-8").splitlines()) > 350
