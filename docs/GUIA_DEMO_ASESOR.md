@@ -1,15 +1,27 @@
 # Guía de demostración para el asesor
 
-Esta guía prepara una **instalación nueva**, con Docker y Compose v2, Git y Python 3 disponibles. Los datos de `db/base-de-datos.sql` son completamente ficticios y las comunicaciones reales permanecen deshabilitadas. No reutilice la carpeta, la base ni el volumen de una instalación operativa.
+Esta guía prepara una **instalación nueva**, con Docker y Compose v2, Git y Python 3.9+ disponibles. En Windows use Docker Desktop iniciado, con contenedores Linux, y Windows PowerShell 5.1 o PowerShell 7. No necesita Bash, WSL ni dependencias pip para los scripts de inicio. Los datos de `db/base-de-datos.sql` son completamente ficticios y las comunicaciones reales permanecen deshabilitadas. No reutilice la carpeta, la base ni el volumen de una instalación operativa.
 
 ## Preparación
 
 Sustituya `URL_DEL_REPOSITORIO_ENTREGADA` por la dirección recibida privadamente:
 
+Linux/macOS:
+
 ```bash
 git clone URL_DEL_REPOSITORIO_ENTREGADA motor-cobranza-ia
 cd motor-cobranza-ia
-cp .env.example .env
+cp -n .env.example .env
+```
+
+Windows PowerShell (Python instalado con `py -3`, `python3` o `python` disponible):
+
+```powershell
+git clone URL_DEL_REPOSITORIO_ENTREGADA motor-cobranza-ia
+if ($LASTEXITCODE -ne 0) { throw 'No se pudo clonar el repositorio.' }
+Set-Location motor-cobranza-ia
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+notepad .env
 ```
 
 Complete `.env` localmente, sin publicar sus valores:
@@ -28,13 +40,44 @@ El acceso Microsoft del evaluador se entrega privadamente. No copie IDs, claves 
 
 ## Restauración y despliegue
 
+Linux/macOS:
+
 ```bash
-chmod +x scripts/restaurar_demo.sh scripts/deploy_demo.sh
-./scripts/restaurar_demo.sh
-./scripts/deploy_demo.sh
+bash scripts/restaurar_demo.sh
+bash scripts/deploy_demo.sh
 ```
 
-`restaurar_demo.sh` levanta solo `db`, espera su healthcheck y consulta si el esquema `public` está vacío. Si contiene tablas, se detiene sin importar, borrar ni reemplazar datos. En una base vacía importa el SQL dentro de una única transacción y consulta realmente los conteos:
+Windows PowerShell, desde la raíz del repositorio:
+
+```powershell
+.\scripts\restaurar_demo.ps1
+.\scripts\deploy_demo.ps1
+```
+
+Cierre el editor después de completar `.env` antes de ejecutar la restauración.
+Si Windows marca los scripts descargados como bloqueados, revise su contenido y
+use `Get-ChildItem .\scripts\*.ps1 | Unblock-File`. Si su política exige scripts
+firmados, solicite el procedimiento autorizado por su administrador; no se cambia
+la política de equipo desde estos scripts. Puede usar `powershell -NoProfile -File
+.\scripts\restaurar_demo.ps1` (o `pwsh`) y su equivalente de deploy.
+
+Los `.ps1` delegan a `demo_windows.py` (biblioteca estándar Python), que llama a
+Docker Compose directamente. El host Windows no necesita `sh`: el `sh -c` de los
+comandos SQL corre dentro del contenedor Linux de PostgreSQL. Compose lee `.env`
+y los overrides del entorno; su JSON efectivo solo pasa al validador existente
+`validar_config_demo.py`, sin imprimirse. Se exige el valor efectivo
+`COMMUNICATIONS_REAL_ENABLED=false` antes de iniciar servicios. El SQL se transmite
+como bytes por stdin para preservar UTF-8 y COPY también con PowerShell 5.1.
+Los errores de Compose se muestran como fallos de fase sin valores privados; los
+errores SQL usan las categorías filtradas de `mostrar_error_importacion.py`.
+
+Validación local del camino Windows: se prueban el ejecutor Python con Docker
+simulado y la estructura estática de las entradas `.ps1`. En el entorno Linux de
+esta revisión no está instalado PowerShell; no se ejecutaron los `.ps1` ni Docker
+Desktop Windows. Queda pendiente el smoke test en Windows: restauración en
+proyecto nuevo, despliegue, acceso Entra y rechazo al repetir la restauración.
+
+`restaurar_demo.sh` y `restaurar_demo.ps1` levantan solo `db`, espera su healthcheck y consulta si el esquema `public` está vacío. Si contiene tablas, se detiene sin importar, borrar ni reemplazar datos. En una base vacía importa el SQL dentro de una única transacción y consulta realmente los conteos:
 
 | Entidad | Cantidad |
 |---|---:|
@@ -46,7 +89,7 @@ chmod +x scripts/restaurar_demo.sh scripts/deploy_demo.sh
 | metricas_snapshots | 15 |
 | administradores | 0 |
 
-`deploy_demo.sh` valida la configuración antes de compilar, espera PostgreSQL, construye backend/frontend, detiene backend y **siempre ejecuta `python -m app.migrate`** antes de arrancar los servicios. Si la migración falla, no continúa al arranque. La migración es aditiva e idempotente. El backend comprueba tablas y columnas antes de aceptar tráfico; ante un esquema incompleto aborta e indica ejecutar la migración.
+`deploy_demo.sh` y `deploy_demo.ps1` validan la configuración antes de compilar, espera PostgreSQL, construye backend/frontend, detiene backend y **siempre ejecuta `python -m app.migrate`** antes de arrancar los servicios. Si la migración falla, no continúa al arranque. La migración es aditiva e idempotente. El backend comprueba tablas y columnas antes de aceptar tráfico; ante un esquema incompleto aborta e indica ejecutar la migración.
 
 Abra **http://localhost:8080/** e inicie sesión con la cuenta Microsoft entregada. Documentación de API: http://127.0.0.1:8000/docs; las rutas de negocio requieren autenticación.
 
@@ -65,7 +108,7 @@ Cada cliente se confirma por separado; un fallo revierte ese cliente y el lote c
 
 - **No usar `docker compose down -v`**: elimina los volúmenes y sus datos.
 - **No ejecutar seeds** después de importar el SQL.
-- No repetir la restauración en una base con datos: el script se negará. Para actualizar esta demo use `deploy_demo.sh`, que conserva los datos y migra antes del arranque.
+- No repetir la restauración en una base con datos: el script se negará. Para actualizar esta demo use `deploy_demo.sh` o `deploy_demo.ps1`, que conserva los datos y migra antes del arranque.
 - Los mensajes simulados no implican envíos. Algunas pruebas aisladas ejercitan proveedores mediante mocks; nunca se necesitan contactos reales para esta guía.
 
 ## Limitación de dependencias de desarrollo

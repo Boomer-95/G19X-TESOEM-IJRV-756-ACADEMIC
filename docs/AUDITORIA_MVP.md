@@ -126,6 +126,6 @@ Ver [Modelo ML](MODELO_ML.md), [Evaluar cartera](EVALUAR_CARTERA.md) y [Decision
 
 ### Afirmaciones documentales pendientes fuera de este ajuste
 
-`frontend-react/README.md` conserva instrucciones de autenticación anteriores: menciona JWT guardado manualmente en localStorage y eliminar una clave `token`. El código actual usa MSAL y sessionStorage; no seguir esa prueba antigua para certificar sesión. La referencia vigente es [README — Microsoft Entra](../README.md#microsoft-entra) y [Seguridad](SEGURIDAD.md). Se señala para una revisión específica de ese documento, sin tocar autenticación ni código.
+`frontend-react/README.md` conserva instrucciones de autenticación anteriores: menciona JWT guardado manualmente en localStorage y eliminar una clave `token`. El código actual usa MSAL y sessionStorage; no seguir esa prueba antigua para certificar sesión. La referencia vigente es [Referencia técnica — Microsoft Entra](REFERENCIA_TECNICA.md#microsoft-entra) y [Seguridad](SEGURIDAD.md). Se señala para una revisión específica de ese documento, sin tocar autenticación ni código.
 
 Las cifras y recomendaciones históricas de npm audit requieren un análisis nuevo antes de afirmarlas como estado vigente de vulnerabilidades; no se consultaron registros de paquetes ni se ejecutó audit aquí. Los requerimientos originales sobre recomendaciones financieras y automatización siguen siendo visión histórica, no capacidades implementadas.

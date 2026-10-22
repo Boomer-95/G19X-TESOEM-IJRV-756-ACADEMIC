@@ -42,3 +42,40 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker build -t plurione-backend .
       - run: docker build -t plurione-frontend ./frontend-react
+  windows-demo-validation:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse demo scripts with native Windows PowerShell
+        shell: powershell
+        run: |
+          $scripts = @(
+            'scripts/restaurar_demo.ps1',
+            'scripts/deploy_demo.ps1',
+            'scripts/demo_windows.ps1'
+          )
+          $hasErrors = $false
+          foreach ($script in $scripts) {
+            $tokens = $null
+            $parseErrors = $null
+            $path = Join-Path $env:GITHUB_WORKSPACE $script
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $path, [ref]$tokens, [ref]$parseErrors
+            )
+            if ($parseErrors.Count -gt 0) {
+              $hasErrors = $true
+              foreach ($parseError in $parseErrors) {
+                Write-Host ("{0}:{1}:{2}: {3}" -f $script, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message)
+              }
+            }
+          }
+          if ($hasErrors) { exit 1 }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # These unit tests mock subprocess/Docker and need only pytest.
+      # Skip backend conftest and its platform-specific dependencies (uvloop).
+      - name: Install isolated demo test dependency
+        run: python -m pip install "pytest>=8,<10"
+      - name: Test demo orchestration with mocks (no real Docker)
+        run: python -m pytest --noconftest tests/test_demo_windows.py -q
