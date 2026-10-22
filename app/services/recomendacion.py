@@ -3,8 +3,89 @@
 Primera coincidencia gana. Umbrales en MXN y días naturales, documentados en
  docs/RECOMENDACION_RECUPERACION.md. No hay escrituras ni acceso a proveedores.
 """
+import os
 from datetime import date
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from math import isfinite
+
+
+def _configuracion_segura():
+    try:
+        pct = float(os.getenv("RECOMENDACION_DESCUENTO_PCT", "10.0"))
+        if not (isfinite(pct) and 0 < pct <= 10.0):
+            pct = 10.0
+    except (ValueError, TypeError):
+        pct = 10.0
+
+    try:
+        raw_dias = os.getenv("RECOMENDACION_DESCUENTO_DIAS", "5")
+        dias = int(raw_dias)
+        if dias <= 0:
+            dias = 5
+    except (ValueError, TypeError):
+        dias = 5
+
+    try:
+        umbral_1 = float(os.getenv("RECOMENDACION_UMBRAL_PLAZO_1", "5000.0"))
+        if not (isfinite(umbral_1) and umbral_1 > 0):
+            umbral_1 = 5000.0
+    except (ValueError, TypeError):
+        umbral_1 = 5000.0
+
+    try:
+        umbral_2 = float(os.getenv("RECOMENDACION_UMBRAL_PLAZO_2", "15000.0"))
+        if not (isfinite(umbral_2) and umbral_2 > 0):
+            umbral_2 = 15000.0
+    except (ValueError, TypeError):
+        umbral_2 = 15000.0
+
+    if not (umbral_1 < umbral_2):
+        umbral_1 = 5000.0
+        umbral_2 = 15000.0
+
+    return pct, dias, umbral_1, umbral_2
+
+
+def _generar_propuestas(saldo_float):
+    pct, dias, umbral_1, umbral_2 = _configuracion_segura()
+    centavos = Decimal("0.01")
+    try:
+        saldo = Decimal(str(saldo_float)).quantize(centavos, rounding=ROUND_HALF_UP)
+    except (InvalidOperation, ValueError, TypeError):
+        saldo = Decimal("0.00")
+    pct_dec = Decimal(str(pct))
+    descuento = (saldo * pct_dec / Decimal("100")).quantize(centavos, rounding=ROUND_HALF_UP)
+    saldo_propuesto = (saldo - descuento).quantize(centavos, rounding=ROUND_HALF_UP)
+    advertencia = "Propuesta sujeta a revisión y autorización humana. No modifica la deuda."
+
+    plazos = [3]
+    if saldo >= Decimal(str(umbral_1)):
+        plazos.append(6)
+    if saldo >= Decimal(str(umbral_2)):
+        plazos.append(12)
+
+    opciones = [
+        {
+            "meses": int(m),
+            "cuota_mensual": float((saldo / Decimal(m)).quantize(centavos, rounding=ROUND_HALF_UP)),
+        }
+        for m in plazos
+    ]
+
+    return {
+        "propuesta_pronto_pago": {
+            "porcentaje_descuento": float(pct),
+            "descuento": float(descuento),
+            "saldo_propuesto": float(saldo_propuesto),
+            "vigencia_dias": int(dias),
+            "advertencia": advertencia,
+        },
+        "propuesta_plan_pagos": {
+            "saldo_base": float(saldo),
+            "opciones": opciones,
+            "advertencia": advertencia,
+        },
+    }
 
 
 def recomendar_recuperacion(*, score_riesgo, segmento, dias_atraso,
@@ -35,7 +116,14 @@ def recomendar_recuperacion(*, score_riesgo, segmento, dias_atraso,
     if dias_atraso == 0:
         return resultado("Recordatorio preventivo", "Saldo activo sin atraso; recordar el vencimiento sin comprometer condiciones.", "normal")
     if dias_atraso >= 30 and saldo_pendiente > 1000:
-        return resultado("Propuesta de plan de pagos", "Atraso de 30 a 89 días y saldo mayor a $1,000 MXN. Evaluar viabilidad; cualquier plan requiere revisión/autorización humana, sin cuotas ni plazos preaprobados.", "alta", True)
+        base = resultado(
+            "Propuesta de plan de pagos",
+            "Atraso de 30 a 89 días y saldo mayor a $1,000 MXN. Las opciones calculadas son propuestas informativas sujetas a revisión y autorización humana; no modifican la deuda ni constituyen un acuerdo aprobado.",
+            "alta",
+            True,
+        )
+        base.update(_generar_propuestas(saldo_pendiente))
+        return base
     motivo = "Saldo de hasta $1,000 MXN o atraso menor a 30 días; recordar el pago del saldo vigente."
     if pagos_puntuales >= 3 and score_riesgo < .33 and segmento == "Bajo riesgo":
         motivo += " Hay al menos tres pagos puntuales observados; favorecer un contacto cordial."

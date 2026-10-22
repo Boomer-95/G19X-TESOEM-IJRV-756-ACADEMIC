@@ -43,9 +43,14 @@ Si score y segmento difieren, cualquiera de los dos indicadores de alto riesgo
 activa seguimiento prioritario. Las reglas anteriores conservan precedencia.
 Con al menos tres pagos puntuales, score < 0.33 y segmento Bajo riesgo, el motivo
 del recordatorio de pago explica que se favorece un contacto cordial. No cambia
-condiciones ni elimina alertas. Los umbrales de saldo organizan la gestión, no
-representan ofertas. No se proponen cuotas, porcentajes, meses ni montos de pago.
-Cualquier plan o negociación requiere revisión/autorización humana.
+condiciones ni elimina alertas. Únicamente en la regla 7 (`Propuesta de plan de pagos`,
+con atraso de 30 a 89 días y saldo mayor a $1,000 MXN), el backend calcula y adjunta
+`propuesta_pronto_pago` y `propuesta_plan_pagos` usando aritmética `Decimal`
+(`ROUND_HALF_UP` a dos decimales) y parámetros configurables con fail-safe
+independiente (`RECOMENDACION_DESCUENTO_PCT`, `RECOMENDACION_DESCUENTO_DIAS`,
+`RECOMENDACION_UMBRAL_PLAZO_1`, `RECOMENDACION_UMBRAL_PLAZO_2`). Las opciones
+calculadas son propuestas informativas sujetas a revisión y autorización humana;
+no modifican la deuda ni constituyen un acuerdo aprobado.
 `requiere_revision_humana=false` solo permite el seguimiento sugerido, nunca
 comprometer condiciones financieras.
 
@@ -75,9 +80,26 @@ Ejemplo completo para score=0.2, segmento=Bajo riesgo, atraso=30, saldo=2000:
 ```json
 {
   "tipo": "Propuesta de plan de pagos",
-  "motivo": "Atraso de 30 a 89 días y saldo mayor a $1,000 MXN. Evaluar viabilidad; cualquier plan requiere revisión/autorización humana, sin cuotas ni plazos preaprobados.",
+  "motivo": "Atraso de 30 a 89 días y saldo mayor a $1,000 MXN. Las opciones calculadas son propuestas informativas sujetas a revisión y autorización humana; no modifican la deuda ni constituyen un acuerdo aprobado.",
   "nivel_atencion": "alta",
-  "requiere_revision_humana": true
+  "requiere_revision_humana": true,
+  "propuesta_pronto_pago": {
+    "porcentaje_descuento": 10.0,
+    "descuento": 200.0,
+    "saldo_propuesto": 1800.0,
+    "vigencia_dias": 5,
+    "advertencia": "Propuesta sujeta a revisión y autorización humana. No modifica la deuda."
+  },
+  "propuesta_plan_pagos": {
+    "saldo_base": 2000.0,
+    "opciones": [
+      {
+        "meses": 3,
+        "cuota_mensual": 666.67
+      }
+    ],
+    "advertencia": "Propuesta sujeta a revisión y autorización humana. No modifica la deuda."
+  }
 }
 ```
 

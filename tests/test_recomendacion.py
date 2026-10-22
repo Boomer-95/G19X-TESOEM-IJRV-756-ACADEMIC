@@ -4,7 +4,20 @@ from unittest.mock import Mock
 
 import pytest
 from app import main, models
-from app.services.recomendacion import recomendar_recuperacion, recomendar_cliente
+from app.services.recomendacion import (
+    _configuracion_segura,
+    _generar_propuestas,
+    recomendar_cliente,
+    recomendar_recuperacion,
+)
+
+
+MOTIVO_PLAN_PAGOS = (
+    "Atraso de 30 a 89 días y saldo mayor a $1,000 MXN. "
+    "Las opciones calculadas son propuestas informativas sujetas a revisión y "
+    "autorización humana; no modifican la deuda ni constituyen un acuerdo aprobado."
+)
+ADVERTENCIA_PROPUESTA = "Propuesta sujeta a revisión y autorización humana. No modifica la deuda."
 
 
 def recomendar(**cambios):
@@ -55,7 +68,12 @@ def test_reglas_y_limites(cambios, tipo, humana):
     assert salida['requiere_revision_humana'] is humana
     assert salida['motivo']
     assert salida['nivel_atencion'] in ('normal', 'alta', 'sin atención')
-    assert set(salida) == {'tipo', 'motivo', 'nivel_atencion', 'requiere_revision_humana'}
+    claves_base = {'tipo', 'motivo', 'nivel_atencion', 'requiere_revision_humana'}
+    if tipo == 'Propuesta de plan de pagos':
+        assert set(salida) == claves_base | {'propuesta_pronto_pago', 'propuesta_plan_pagos'}
+        assert salida['motivo'] == MOTIVO_PLAN_PAGOS
+    else:
+        assert set(salida) == claves_base
 
 
 @pytest.mark.parametrize('cambios', [
@@ -120,3 +138,105 @@ def test_ficha_solo_lectura_y_actualizacion_datos(client, db, headers, monkeypat
     assert not modelo.mock_calls
     # Evita que lifespan intente cerrar el objeto de prueba síncrono.
     monkeypatch.setattr(main, 'client', None)
+
+
+def test_propuestas_descuento_plazos_y_disclaimer():
+    # Deuda baja (< umbral_1 = 5000): solo 3 meses
+    baja = recomendar(dias_atraso=30, saldo_pendiente=2000)
+    assert baja['propuesta_pronto_pago'] == {
+        'porcentaje_descuento': 10.0,
+        'descuento': 200.0,
+        'saldo_propuesto': 1800.0,
+        'vigencia_dias': 5,
+        'advertencia': ADVERTENCIA_PROPUESTA,
+    }
+    assert baja['propuesta_plan_pagos'] == {
+        'saldo_base': 2000.0,
+        'opciones': [{'meses': 3, 'cuota_mensual': 666.67}],
+        'advertencia': ADVERTENCIA_PROPUESTA,
+    }
+
+    # Deuda media (>= 5000 y < 15000): 3 y 6 meses
+    media = recomendar(dias_atraso=45, saldo_pendiente=6000)
+    assert [o['meses'] for o in media['propuesta_plan_pagos']['opciones']] == [3, 6]
+    assert media['propuesta_plan_pagos']['opciones'] == [
+        {'meses': 3, 'cuota_mensual': 2000.0},
+        {'meses': 6, 'cuota_mensual': 1000.0},
+    ]
+
+    # Deuda alta (>= 15000 y < 50000): 3, 6 y 12 meses
+    alta = recomendar(dias_atraso=60, saldo_pendiente=15000)
+    assert [o['meses'] for o in alta['propuesta_plan_pagos']['opciones']] == [3, 6, 12]
+    assert alta['propuesta_plan_pagos']['opciones'] == [
+        {'meses': 3, 'cuota_mensual': 5000.0},
+        {'meses': 6, 'cuota_mensual': 2500.0},
+        {'meses': 12, 'cuota_mensual': 1250.0},
+    ]
+
+
+def test_redondeo_decimal_evita_errores_coma_flotante():
+    propuestas = _generar_propuestas(1000.33)
+    assert propuestas['propuesta_pronto_pago'] == {
+        'porcentaje_descuento': 10.0,
+        'descuento': 100.03,
+        'saldo_propuesto': 900.30,
+        'vigencia_dias': 5,
+        'advertencia': ADVERTENCIA_PROPUESTA,
+    }
+    assert propuestas['propuesta_plan_pagos'] == {
+        'saldo_base': 1000.33,
+        'opciones': [{'meses': 3, 'cuota_mensual': 333.44}],
+        'advertencia': ADVERTENCIA_PROPUESTA,
+    }
+
+
+@pytest.mark.parametrize('env_vars,esperado', [
+    ({}, (10.0, 5, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': '7.5', 'RECOMENDACION_DESCUENTO_DIAS': '10',
+      'RECOMENDACION_UMBRAL_PLAZO_1': '3000', 'RECOMENDACION_UMBRAL_PLAZO_2': '12000'},
+     (7.5, 10, 3000.0, 12000.0)),
+    # Descuento > 10% revierte solo el porcentaje a 10.0
+    ({'RECOMENDACION_DESCUENTO_PCT': '15.0', 'RECOMENDACION_DESCUENTO_DIAS': '8'},
+     (10.0, 8, 5000.0, 15000.0)),
+    # Descuento 0 o negativo o texto inválido
+    ({'RECOMENDACION_DESCUENTO_PCT': '0', 'RECOMENDACION_DESCUENTO_DIAS': '7'},
+     (10.0, 7, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': '-5', 'RECOMENDACION_DESCUENTO_DIAS': '7'},
+     (10.0, 7, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': 'invalido', 'RECOMENDACION_DESCUENTO_DIAS': '7'},
+     (10.0, 7, 5000.0, 15000.0)),
+    # Días inválidos, negativos o cero no afectan otras variables válidas
+    ({'RECOMENDACION_DESCUENTO_PCT': '5.0', 'RECOMENDACION_DESCUENTO_DIAS': '0'},
+     (5.0, 5, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': '5.0', 'RECOMENDACION_DESCUENTO_DIAS': '-3'},
+     (5.0, 5, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': '5.0', 'RECOMENDACION_DESCUENTO_DIAS': 'abc'},
+     (5.0, 5, 5000.0, 15000.0)),
+    # Un umbral válido y otro inválido (independencia cuando umbral_1 < umbral_2 se mantiene)
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '4000', 'RECOMENDACION_UMBRAL_PLAZO_2': 'invalido'},
+     (10.0, 5, 4000.0, 15000.0)),
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '-100', 'RECOMENDACION_UMBRAL_PLAZO_2': '20000'},
+     (10.0, 5, 5000.0, 20000.0)),
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '0', 'RECOMENDACION_UMBRAL_PLAZO_2': '18000'},
+     (10.0, 5, 5000.0, 18000.0)),
+    # UMBRAL_1 >= UMBRAL_2 revierte AMBOS umbrales a 5000.0 y 15000.0
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '20000', 'RECOMENDACION_UMBRAL_PLAZO_2': '10000',
+      'RECOMENDACION_DESCUENTO_PCT': '8.0'},
+     (8.0, 5, 5000.0, 15000.0)),
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '10000', 'RECOMENDACION_UMBRAL_PLAZO_2': '10000'},
+     (10.0, 5, 5000.0, 15000.0)),
+    # Un umbral válido alto que al revertir el otro inválido rompe umbral_1 < umbral_2
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '16000', 'RECOMENDACION_UMBRAL_PLAZO_2': 'texto'},
+     (10.0, 5, 5000.0, 15000.0)),
+])
+def test_configuracion_segura_failsafe_independiente(monkeypatch, env_vars, esperado):
+    for var in (
+        'RECOMENDACION_DESCUENTO_PCT',
+        'RECOMENDACION_DESCUENTO_DIAS',
+        'RECOMENDACION_UMBRAL_PLAZO_1',
+        'RECOMENDACION_UMBRAL_PLAZO_2',
+    ):
+        monkeypatch.delenv(var, raising=False)
+    for k, v in env_vars.items():
+        monkeypatch.setenv(k, v)
+    assert _configuracion_segura() == esperado
