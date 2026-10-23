@@ -195,8 +195,12 @@ def test_redondeo_decimal_evita_errores_coma_flotante():
     ({'RECOMENDACION_DESCUENTO_PCT': '7.5', 'RECOMENDACION_DESCUENTO_DIAS': '10',
       'RECOMENDACION_UMBRAL_PLAZO_1': '3000', 'RECOMENDACION_UMBRAL_PLAZO_2': '12000'},
      (7.5, 10, 3000.0, 12000.0)),
-    # Descuento > 10% revierte solo el porcentaje a 10.0
+    # Descuento > 10% (incluyendo 10.01, 15.0, 100) revierte solo el porcentaje a 10.0
+    ({'RECOMENDACION_DESCUENTO_PCT': '10.01', 'RECOMENDACION_DESCUENTO_DIAS': '8'},
+     (10.0, 8, 5000.0, 15000.0)),
     ({'RECOMENDACION_DESCUENTO_PCT': '15.0', 'RECOMENDACION_DESCUENTO_DIAS': '8'},
+     (10.0, 8, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': '100', 'RECOMENDACION_DESCUENTO_DIAS': '8'},
      (10.0, 8, 5000.0, 15000.0)),
     # Descuento 0 o negativo o texto inválido
     ({'RECOMENDACION_DESCUENTO_PCT': '0', 'RECOMENDACION_DESCUENTO_DIAS': '7'},
@@ -213,6 +217,8 @@ def test_redondeo_decimal_evita_errores_coma_flotante():
     ({'RECOMENDACION_DESCUENTO_PCT': '5.0', 'RECOMENDACION_DESCUENTO_DIAS': 'abc'},
      (5.0, 5, 5000.0, 15000.0)),
     # Un umbral válido y otro inválido (independencia cuando umbral_1 < umbral_2 se mantiene)
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': 'texto', 'RECOMENDACION_UMBRAL_PLAZO_2': '20000'},
+     (10.0, 5, 5000.0, 20000.0)),
     ({'RECOMENDACION_UMBRAL_PLAZO_1': '4000', 'RECOMENDACION_UMBRAL_PLAZO_2': 'invalido'},
      (10.0, 5, 4000.0, 15000.0)),
     ({'RECOMENDACION_UMBRAL_PLAZO_1': '-100', 'RECOMENDACION_UMBRAL_PLAZO_2': '20000'},

@@ -10,40 +10,43 @@ from math import isfinite
 
 
 def _configuracion_segura():
+    pct = Decimal("10.0")
     try:
-        pct = float(os.getenv("RECOMENDACION_DESCUENTO_PCT", "10.0"))
-        if not (isfinite(pct) and 0 < pct <= 10.0):
-            pct = 10.0
-    except (ValueError, TypeError):
-        pct = 10.0
+        val_pct = Decimal(os.getenv("RECOMENDACION_DESCUENTO_PCT", "10.0"))
+        if val_pct.is_finite() and Decimal("0") < val_pct <= Decimal("10.0"):
+            pct = val_pct
+    except (InvalidOperation, ValueError, TypeError):
+        pct = Decimal("10.0")
 
+    dias = 5
     try:
-        raw_dias = os.getenv("RECOMENDACION_DESCUENTO_DIAS", "5")
-        dias = int(raw_dias)
-        if dias <= 0:
-            dias = 5
-    except (ValueError, TypeError):
+        val_dias = int(os.getenv("RECOMENDACION_DESCUENTO_DIAS", "5"))
+        if val_dias > 0:
+            dias = val_dias
+    except (InvalidOperation, ValueError, TypeError):
         dias = 5
 
+    umbral1 = Decimal("5000.0")
     try:
-        umbral_1 = float(os.getenv("RECOMENDACION_UMBRAL_PLAZO_1", "5000.0"))
-        if not (isfinite(umbral_1) and umbral_1 > 0):
-            umbral_1 = 5000.0
-    except (ValueError, TypeError):
-        umbral_1 = 5000.0
+        val_u1 = Decimal(os.getenv("RECOMENDACION_UMBRAL_PLAZO_1", "5000.0"))
+        if val_u1.is_finite() and val_u1 > Decimal("0"):
+            umbral1 = val_u1
+    except (InvalidOperation, ValueError, TypeError):
+        umbral1 = Decimal("5000.0")
 
+    umbral2 = Decimal("15000.0")
     try:
-        umbral_2 = float(os.getenv("RECOMENDACION_UMBRAL_PLAZO_2", "15000.0"))
-        if not (isfinite(umbral_2) and umbral_2 > 0):
-            umbral_2 = 15000.0
-    except (ValueError, TypeError):
-        umbral_2 = 15000.0
+        val_u2 = Decimal(os.getenv("RECOMENDACION_UMBRAL_PLAZO_2", "15000.0"))
+        if val_u2.is_finite() and val_u2 > Decimal("0"):
+            umbral2 = val_u2
+    except (InvalidOperation, ValueError, TypeError):
+        umbral2 = Decimal("15000.0")
 
-    if not (umbral_1 < umbral_2):
-        umbral_1 = 5000.0
-        umbral_2 = 15000.0
+    if not (umbral1 < umbral2):
+        umbral1 = Decimal("5000.0")
+        umbral2 = Decimal("15000.0")
 
-    return pct, dias, umbral_1, umbral_2
+    return float(pct), int(dias), float(umbral1), float(umbral2)
 
 
 def _generar_propuestas(saldo_float):

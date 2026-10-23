@@ -68,16 +68,20 @@ export default function FichaCliente({ detalle, alActualizar, alRefrescar }) {
         <p>{detalle.recomendacion_recuperacion.motivo}</p>
         <p>Nivel de atención: {detalle.recomendacion_recuperacion.nivel_atencion}</p>
         <p>{detalle.recomendacion_recuperacion.requiere_revision_humana ? 'Requiere revisión/autorización humana.' : 'No requiere revisión humana previa para el seguimiento sugerido.'}</p>
-        {detalle.recomendacion_recuperacion.propuesta_pronto_pago && detalle.recomendacion_recuperacion.propuesta_plan_pagos && <>
-          <p><strong>Propuesta de pronto pago:</strong> {`${detalle.recomendacion_recuperacion.propuesta_pronto_pago.porcentaje_descuento}% de descuento (${dinero(detalle.recomendacion_recuperacion.propuesta_pronto_pago.descuento)}) · Saldo propuesto: ${dinero(detalle.recomendacion_recuperacion.propuesta_pronto_pago.saldo_propuesto)} · Vigencia: ${detalle.recomendacion_recuperacion.propuesta_pronto_pago.vigencia_dias} días.`}</p>
-          <p className="texto-secundario">{detalle.recomendacion_recuperacion.propuesta_pronto_pago.advertencia}</p>
-          <p><strong>Propuesta de plan de pagos</strong> {`(Saldo base: ${dinero(detalle.recomendacion_recuperacion.propuesta_plan_pagos.saldo_base)}):`}</p>
-          <ul>
-            {detalle.recomendacion_recuperacion.propuesta_plan_pagos.opciones.map(op => <li key={op.meses}>
-              {`${op.meses} meses: Cuota mensual estimada de ${dinero(op.cuota_mensual)}`}
-            </li>)}
-          </ul>
-          <p className="texto-secundario">{detalle.recomendacion_recuperacion.propuesta_plan_pagos.advertencia}</p>
+        {(detalle.recomendacion_recuperacion.propuesta_pronto_pago || detalle.recomendacion_recuperacion.propuesta_plan_pagos) && <>
+          {detalle.recomendacion_recuperacion.propuesta_pronto_pago && <>
+            <p><strong>Propuesta de pronto pago:</strong> {`${detalle.recomendacion_recuperacion.propuesta_pronto_pago.porcentaje_descuento}% de descuento (${dinero(detalle.recomendacion_recuperacion.propuesta_pronto_pago.descuento)}) · Saldo propuesto: ${dinero(detalle.recomendacion_recuperacion.propuesta_pronto_pago.saldo_propuesto)} · Vigencia: ${detalle.recomendacion_recuperacion.propuesta_pronto_pago.vigencia_dias} días.`}</p>
+            <p className="texto-secundario">{detalle.recomendacion_recuperacion.propuesta_pronto_pago.advertencia}</p>
+          </>}
+          {detalle.recomendacion_recuperacion.propuesta_plan_pagos && <>
+            <p><strong>Propuesta de plan de pagos</strong> {`(Saldo base: ${dinero(detalle.recomendacion_recuperacion.propuesta_plan_pagos.saldo_base)}):`}</p>
+            <ul>
+              {detalle.recomendacion_recuperacion.propuesta_plan_pagos.opciones.map(opc => <li key={opc.meses}>
+                <strong>{opc.meses} meses:</strong> Cuota mensual estimada de {dinero(opc.cuota_mensual)}
+              </li>)}
+            </ul>
+            <p className="texto-secundario">{detalle.recomendacion_recuperacion.propuesta_plan_pagos.advertencia}</p>
+          </>}
         </>}
         <p className="texto-secundario">No modifica la deuda ni autoriza condiciones financieras. No reemplaza la decisión humana.</p>
       </> : <p>Recomendación no disponible.</p>}
