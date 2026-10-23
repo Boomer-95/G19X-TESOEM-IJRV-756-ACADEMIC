@@ -380,3 +380,68 @@ def test_sin_deuda_no_comunicacion_de_cobranza(client, db, headers, monkeypatch,
     create.assert_not_awaited()
     registrar.assert_not_called()
     assert db.query(models.Comunicacion).count() == 0
+
+
+def test_groq_recibe_recomendacion_sin_propuesta_financiera_y_prompt_restringido(client, db, headers, cartera, monkeypatch):
+    import json
+    from app.services.recomendacion import recomendar_cliente
+    create = groq(monkeypatch)
+    c = cartera[0]  # atraso 10 días -> Recordatorio de pago (sin propuestas financieras)
+    res = client.post(f'/ia/analizar-riesgo/{c.id}', headers=headers)
+    assert res.status_code == 200
+    create.assert_awaited_once()
+    mensajes = create.call_args.kwargs['messages']
+    system_prompt = mensajes[0]['content']
+    payload = json.loads(mensajes[1]['content'])
+
+    db.refresh(c)
+    esperada = recomendar_cliente(c)
+    assert esperada['tipo'] != 'Propuesta de plan de pagos'
+    assert 'recomendacion_recuperacion' in payload
+    assert payload['recomendacion_recuperacion'] == esperada
+    assert 'propuesta_pronto_pago' not in payload['recomendacion_recuperacion']
+    assert 'propuesta_plan_pagos' not in payload['recomendacion_recuperacion']
+
+    assert 'solo redacta' in system_prompt.lower()
+    assert 'no decides condiciones financieras' in system_prompt.lower()
+    assert 'no inventes descuentos' in system_prompt.lower()
+    assert 'no inventes plazos' in system_prompt.lower()
+    assert 'no inventes cuotas' in system_prompt.lower()
+    assert 'respetar exactamente los valores proporcionados' in system_prompt.lower()
+
+
+def test_groq_recibe_propuestas_exactas_en_plan_de_pagos(client, db, headers, monkeypatch):
+    import json
+    from app.services.recomendacion import recomendar_cliente
+    class ModeloBajoRiesgo:
+        def predict_proba(self, _frame):
+            return [[0.2, 0.8]]
+    monkeypatch.setattr(main, '_modelo_riesgo', ModeloBajoRiesgo())
+    c = models.Cliente(nombre='Cliente Plan Pagos', email='plan@example.invalid')
+    db.add(c)
+    db.flush()
+    db.add(models.Deuda(cliente_id=c.id, monto_total=6000, saldo_pendiente=6000,
+                        fecha_vencimiento=date.today() - timedelta(days=45), estatus='En Mora'))
+    db.commit()
+
+    create = groq(monkeypatch)
+    res = client.post(f'/ia/analizar-riesgo/{c.id}', headers=headers)
+    assert res.status_code == 200
+    create.assert_awaited_once()
+    payload = json.loads(create.call_args.kwargs['messages'][1]['content'])
+
+    db.refresh(c)
+    esperada = recomendar_cliente(c)
+    assert esperada['tipo'] == 'Propuesta de plan de pagos'
+    rec = payload['recomendacion_recuperacion']
+    assert rec == esperada
+
+    assert 'propuesta_pronto_pago' in rec
+    for clave in ('porcentaje_descuento', 'descuento', 'saldo_propuesto', 'vigencia_dias'):
+        assert clave in rec['propuesta_pronto_pago']
+    assert 'propuesta_plan_pagos' in rec
+    assert 'opciones' in rec['propuesta_plan_pagos']
+    assert len(rec['propuesta_plan_pagos']['opciones']) > 0
+    for opcion in rec['propuesta_plan_pagos']['opciones']:
+        assert 'meses' in opcion
+        assert 'cuota_mensual' in opcion

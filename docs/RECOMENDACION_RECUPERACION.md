@@ -54,11 +54,14 @@ no modifican la deuda ni constituyen un acuerdo aprobado.
 `requiere_revision_humana=false` solo permite el seguimiento sugerido, nunca
 comprometer condiciones financieras.
 
-Groq no participa en esta recomendación y el flujo existente de generación de
-mensajes no se modifica ni recibe este dato en este MVP. No hay nuevas llamadas
-a Groq, Twilio o SendGrid. Si posteriormente se integra como contexto, debe
-pasarse como decisión ya tomada; Groq solo podrá redactar, sin decidir ni inventar
-condiciones financieras. No cambia prioridad, pagos ni autenticación.
+La recomendación financiera sigue siendo determinista y calculada en el backend:
+Groq no participa en su cálculo ni realiza llamadas durante `GET /api/clientes/{id}`.
+Al generar una estrategia en `POST /ia/analizar-riesgo/{cliente_id}`, Groq recibe
+`recomendacion_recuperacion` como contexto estructurado y su función se limita
+estrictamente a redactar el mensaje: no decide, modifica ni inventa condiciones
+financieras (descuentos, plazos, cuotas o convenios) y conserva el carácter
+informativo sujeto a revisión/autorización humana. No cambia prioridad, pagos ni
+autenticación.
 
 Ejemplos de entrada a `recomendar_recuperacion` (pagos_puntuales=0 por defecto):
 
