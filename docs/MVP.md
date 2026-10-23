@@ -25,6 +25,7 @@ La automatización se limita a cálculos, generación/adaptación, solicitudes a
 | Pagos | Registro parcial/total con validación, transacción, historial y recálculo de riesgo cuando corresponde. |
 | Riesgo predictivo | Random Forest scikit-learn local con seis features; umbrales y prioridad score × saldo. |
 | Estrategias IA | Generación Groq, reutilización y regeneración explícita; versiones históricas conservadas. |
+| Sugerencia de canal basada en asociación temporal histórica | Regla observacional (`app/services/canal_sugerido.py`) sobre entregas/lecturas, fallos y pagos dentro de la ventana temporal; preselecciona el canal en la ficha manteniendo la elección manual. No es un modelo predictivo de IA ni demuestra causalidad. |
 | Comunicaciones | Email, SMS y WhatsApp opcionales; simulación disponible; texto editable y vínculo de estrategia. Llamada solo como guion simulado. |
 | Estados de proveedor | Twilio con callbacks firmados; SendGrid con aceptación sin confirmación de entrega. |
 | Analítica IA | Periodos 30/90/180/365, KPIs, gráficas lineales responsive, comparación de estrategias/pagos y canales. |
@@ -40,7 +41,7 @@ Existe la acción **Evaluar cartera** (`POST /api/cartera/evaluar`) para scoring
 - Alta/edición/eliminación general de clientes y deudas desde la interfaz, ni carga masiva de cartera.
 - Portal del deudor, cobro bancario, pasarela de pago o registro retroactivo de pagos.
 - Descuentos, recargos, convenios o reestructuración aplicados automáticamente.
-- Predicción del mejor canal, campañas programadas o envío autónomo.
+- Modelo predictivo de IA para selección de canal, campañas programadas o envío autónomo.
 - Voice real, callback de entrega SendGrid o refresco continuo de estados.
 - Modelo entrenado/calibrado con datos empresariales reales o infraestructura Azure Machine Learning.
 - Roles internos avanzados, ERP/CRM, BI externo o despliegue productivo certificado.
@@ -101,8 +102,8 @@ Este documento no ejecuta de nuevo las suites ni certifica las cuentas externas.
 
 | MVP v1 implementado | Post-MVP propuesto, no implementado |
 | --- | --- |
-| Priorización score × saldo y canal elegido por usuario | Selección predictiva del canal con validación empresarial. |
-| Estrategias revisadas por el usuario | Recomendaciones de descuentos y reestructuración sujetas a políticas y autorización. |
+| Priorización score × saldo, sugerencia observacional de canal por asociación temporal histórica y elección final por usuario | Modelo predictivo de IA para selección de canal con validación empresarial y atribución causal. |
+| Estrategias revisadas por el usuario y propuestas informativas sujetas a revisión humana | Aplicación automatizada de descuentos y reestructuración con motor de políticas y autorización. |
 | Random Forest entrenado con datos sintéticos | Modelos con datos empresariales autorizados, evaluación temporal y calibración. |
 | Acceso Entra por scope | Roles avanzados y permisos por operación/cartera. |
 | PostgreSQL y consultas propias | ERP/CRM, intercambio controlado de cartera y BI externo. |
