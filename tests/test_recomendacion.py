@@ -234,6 +234,40 @@ def test_redondeo_decimal_evita_errores_coma_flotante():
     # Un umbral válido alto que al revertir el otro inválido rompe umbral_1 < umbral_2
     ({'RECOMENDACION_UMBRAL_PLAZO_1': '16000', 'RECOMENDACION_UMBRAL_PLAZO_2': 'texto'},
      (10.0, 5, 5000.0, 15000.0)),
+    # RECOMENDACION_DESCUENTO_PCT con NaN, Infinity, -Infinity y ""
+    ({'RECOMENDACION_DESCUENTO_PCT': 'NaN', 'RECOMENDACION_DESCUENTO_DIAS': '6'},
+     (10.0, 6, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': 'Infinity', 'RECOMENDACION_DESCUENTO_DIAS': '6'},
+     (10.0, 6, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': '-Infinity', 'RECOMENDACION_DESCUENTO_DIAS': '6'},
+     (10.0, 6, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': '', 'RECOMENDACION_DESCUENTO_DIAS': '6'},
+     (10.0, 6, 5000.0, 15000.0)),
+    # RECOMENDACION_UMBRAL_PLAZO_1 con NaN, Infinity, -Infinity y ""
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': 'NaN', 'RECOMENDACION_UMBRAL_PLAZO_2': '20000'},
+     (10.0, 5, 5000.0, 20000.0)),
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': 'Infinity', 'RECOMENDACION_UMBRAL_PLAZO_2': '20000'},
+     (10.0, 5, 5000.0, 20000.0)),
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '-Infinity', 'RECOMENDACION_UMBRAL_PLAZO_2': '20000'},
+     (10.0, 5, 5000.0, 20000.0)),
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '', 'RECOMENDACION_UMBRAL_PLAZO_2': '20000'},
+     (10.0, 5, 5000.0, 20000.0)),
+    # RECOMENDACION_UMBRAL_PLAZO_2 con NaN, Infinity, -Infinity y ""
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '4000', 'RECOMENDACION_UMBRAL_PLAZO_2': 'NaN'},
+     (10.0, 5, 4000.0, 15000.0)),
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '4000', 'RECOMENDACION_UMBRAL_PLAZO_2': 'Infinity'},
+     (10.0, 5, 4000.0, 15000.0)),
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '4000', 'RECOMENDACION_UMBRAL_PLAZO_2': '-Infinity'},
+     (10.0, 5, 4000.0, 15000.0)),
+    ({'RECOMENDACION_UMBRAL_PLAZO_1': '4000', 'RECOMENDACION_UMBRAL_PLAZO_2': ''},
+     (10.0, 5, 4000.0, 15000.0)),
+    # RECOMENDACION_DESCUENTO_DIAS con NaN, Infinity y ""
+    ({'RECOMENDACION_DESCUENTO_PCT': '5.0', 'RECOMENDACION_DESCUENTO_DIAS': 'NaN'},
+     (5.0, 5, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': '5.0', 'RECOMENDACION_DESCUENTO_DIAS': 'Infinity'},
+     (5.0, 5, 5000.0, 15000.0)),
+    ({'RECOMENDACION_DESCUENTO_PCT': '5.0', 'RECOMENDACION_DESCUENTO_DIAS': ''},
+     (5.0, 5, 5000.0, 15000.0)),
 ])
 def test_configuracion_segura_failsafe_independiente(monkeypatch, env_vars, esperado):
     for var in (
