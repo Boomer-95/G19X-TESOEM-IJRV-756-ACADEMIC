@@ -136,7 +136,7 @@ export default function FichaCliente({ detalle, alActualizar, alRefrescar }) {
         <td><span className="badge-estado" data-estado={estadoComunicacion(c)}>{estadoComunicacion(c).slice(String(c.canal).length + 3)}</span></td>
       </tr>)}</tbody>
     </table></div> : <p>Sin comunicaciones registradas.</p>}
-    <Comunicacion key={detalle.sin_deuda_activa ? 'sin-deuda' : detalle.ultima_estrategia?.id ?? 'sin-estrategia'} permitirEdicion
+    <Comunicacion key={`${clienteId}-${detalle.sin_deuda_activa ? 'sin-deuda' : detalle.ultima_estrategia?.id ?? 'sin-estrategia'}`} permitirEdicion
       canalSugerido={detalle.canal_sugerido?.canal}
       resultado={{ clienteId, estrategiaId: detalle.sin_deuda_activa ? null : detalle.ultima_estrategia?.id, mensaje: detalle.sin_deuda_activa ? '' : detalle.ultima_estrategia?.mensaje || '' }}
       alRegistrar={() => { alRefrescar().catch(e => setErrorAccion(e.message)); }} />
