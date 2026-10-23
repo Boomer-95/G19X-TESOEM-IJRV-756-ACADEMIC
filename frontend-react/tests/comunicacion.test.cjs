@@ -7,7 +7,7 @@ const { transformSync } = require('esbuild');
 
 // Ejecuta el componente real con un arnés de hooks y una API en memoria.
 // No necesita navegador, credenciales ni conexiones de red.
-function montar(apiFetch, estrategiaId = null) {
+function montar(apiFetch, estrategiaId = null, canalSugerido = undefined) {
   const slots = [];
   const effects = [];
   let cursor = 0;
@@ -43,7 +43,10 @@ function montar(apiFetch, estrategiaId = null) {
   }, { filename });
   function render() {
     cursor = 0;
-    return module.exports.default({ resultado: { clienteId: 1, estrategiaId, mensaje: 'Mensaje original' } });
+    return module.exports.default({
+      resultado: { clienteId: 1, estrategiaId, mensaje: 'Mensaje original' },
+      canalSugerido,
+    });
   }
   render();
   effects.forEach(effect => effect());
@@ -130,4 +133,16 @@ test('envío de una estrategia existente conserva su identificador', async () =>
   await buscar(render(), 'button').props.onClick();
   assert.equal(cuerpo.estrategia_id, 42);
   assert.equal(cuerpo.cliente_id, 1);
+});
+
+test('preselecciona canalSugerido al montar y permite cambiarlo manualmente', async () => {
+  const render = montar(async () => ({ ok: true, json: async () => ({ twilio_sms: true }) }), null, 'SMS');
+  await new Promise(resolve => setImmediate(resolve));
+  let tree = render();
+  const select = buscar(tree, 'select');
+  assert.equal(select.props.value, 'SMS');
+
+  select.props.onChange({ target: { value: 'WhatsApp' } });
+  tree = render();
+  assert.equal(buscar(tree, 'select').props.value, 'WhatsApp');
 });

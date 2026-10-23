@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from './api';
 
-export default function Comunicacion({ resultado, alRegistrar, permitirEdicion = false }) {
+export default function Comunicacion({ resultado, alRegistrar, permitirEdicion = false, canalSugerido }) {
   const [mensaje, setMensaje] = useState(resultado.mensaje || '');
-  const [canal, setCanal] = useState('Email');
+  const [canal, setCanal] = useState(canalSugerido || 'Email');
   const [cargando, setCargando] = useState(false);
   const [estado, setEstado] = useState('');
   const [proveedores, setProveedores] = useState(null);
