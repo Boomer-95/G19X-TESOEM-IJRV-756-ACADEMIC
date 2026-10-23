@@ -36,7 +36,7 @@ Complete `.env` localmente, sin publicar sus valores:
 
 Para separar el volumen de otra instalación, añada a este `.env` nuevo un `COMPOSE_PROJECT_NAME` exclusivo, por ejemplo `motor-cobranza-demo-asesor`. No cambie el nombre de proyecto de una instalación operativa existente. Los puertos 8000 y 8080 deben estar libres. Docker construye la conexión usando el servicio `db`; no hace falta configurar `DATABASE_URL` para estos comandos.
 
-El acceso Microsoft del evaluador se entrega privadamente. No copie IDs, claves o tokens a capturas públicas ni al repositorio.
+El revisor utiliza una **cuenta Microsoft dedicada de evaluación**, no la cuenta personal del desarrollador. Las credenciales se comparten únicamente por **TODO Academy → Mis documentos → Técnicos → Accesos de prueba**. Consulte [Acceso del evaluador y checklist de entrega](ACCESO_EVALUADOR.md). No copie IDs, claves o tokens a capturas públicas ni al repositorio.
 
 ## Restauración y despliegue
 

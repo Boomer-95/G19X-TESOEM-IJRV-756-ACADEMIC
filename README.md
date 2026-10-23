@@ -30,9 +30,9 @@ notepad .env  # Complete PostgreSQL y Entra; COMPOSE_PROJECT_NAME exclusivo; COM
 
 Abra **http://localhost:8080/**. La [guía demo](docs/GUIA_DEMO_ASESOR.md) detalla las variables, requisitos y permisos de scripts. Restauración solo en BD vacía; no borra datos. No ejecutar seeds después ni `docker compose down -v`. Mantenga `COMMUNICATIONS_REAL_ENABLED=false`; Groq no es necesario para consultar los escenarios precargados.
 
-## Acceso de prueba
+## Acceso de evaluación
 
-La cuenta y las credenciales de evaluación Microsoft Entra se entregan **de forma privada en TODO Academy**, junto con la configuración necesaria. No existe usuario local de demo ni contraseña incluida en el repositorio. No necesita client secrets.
+La aplicación mantiene Microsoft Entra ID como autenticación. La cuenta dedicada de evaluación se entrega de forma privada en TODO Academy; consulte [Acceso del evaluador](docs/ACCESO_EVALUADOR.md).
 
 ## Qué se puede demostrar
 
