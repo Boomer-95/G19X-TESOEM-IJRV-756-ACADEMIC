@@ -3,9 +3,9 @@ from unittest.mock import Mock, AsyncMock
 from twilio.base.exceptions import TwilioRestException
 import pytest
 from sqlalchemy import create_engine, text
-from app import main, models
+from app import models
 from app.migrate import migrar
-from app.services import twilio_service, sendgrid_service
+from app.services import comunicaciones, groq, mensajes, twilio_service, sendgrid_service
 from app.services.mensajes import preparar_sms, validar_sms
 
 
@@ -13,7 +13,7 @@ from app.services.mensajes import preparar_sms, validar_sms
 def groq_adaptacion(client, monkeypatch):
     create = AsyncMock(return_value=SimpleNamespace(choices=[SimpleNamespace(
         message=SimpleNamespace(content='Mensaje de prueba'), finish_reason='stop')]))
-    monkeypatch.setattr(main, 'client', SimpleNamespace(chat=SimpleNamespace(
+    monkeypatch.setattr(groq, 'client', SimpleNamespace(chat=SimpleNamespace(
         completions=SimpleNamespace(create=create)), close=AsyncMock()))
     return create
 
@@ -351,7 +351,7 @@ def test_groq_falla_sin_envio(client, db, headers, contacto, configurado, groq_a
     if fallo == 'excepcion':
         groq_adaptacion.side_effect = RuntimeError('SECRETO-SENTINELA')
     elif fallo == 'sin_configuracion':
-        monkeypatch.setattr(main, 'client', None)
+        monkeypatch.setattr(groq, 'client', None)
     elif fallo == 'truncado':
         groq_adaptacion.return_value.choices[0].finish_reason = 'length'
     elif fallo == 'vacio':
@@ -486,7 +486,7 @@ def test_error_programacion_local_no_se_disfraza_de_502(client, headers, contact
                                                      configurado, monkeypatch):
     def roto(_):
         raise RuntimeError('Error de programación local')
-    monkeypatch.setattr(main, 'adaptar_sms', roto)
+    monkeypatch.setattr(mensajes, 'adaptar_sms', roto)
     with pytest.raises(RuntimeError, match='Error de programación local'):
         enviar(client, headers, contacto, 'SMS')
     for proveedor in configurado:
@@ -504,7 +504,7 @@ def test_sms_length_util_se_entrega_a_comunicaciones_mock(client, db, headers, c
     registro = SimpleNamespace(id=7, cliente_id=contacto.id, canal='SMS', fecha_envio=date.today(),
         mensaje=esperado, exitoso=False, modo='simulado', estado='Simulado', provider=None)
     registrar = Mock(return_value=registro)
-    monkeypatch.setattr(main.comunicaciones, 'registrar', registrar)
+    monkeypatch.setattr(comunicaciones, 'registrar', registrar)
     res = enviar(client, headers, contacto, 'SMS')
     assert res.status_code == 201
     registrar.assert_called_once_with(db, contacto, 'SMS', esperado)
@@ -522,7 +522,7 @@ def test_sms_length_inutil_no_registra(client, db, headers, contacto, groq_adapt
     opcion = groq_adaptacion.return_value.choices[0]
     opcion.finish_reason, opcion.message.content = 'length', contenido
     registrar = Mock()
-    monkeypatch.setattr(main.comunicaciones, 'registrar', registrar)
+    monkeypatch.setattr(comunicaciones, 'registrar', registrar)
     assert enviar(client, headers, contacto, 'SMS').status_code == 502
     registrar.assert_not_called()
     assert db.query(models.Comunicacion).count() == 0
@@ -547,7 +547,7 @@ def test_razonamiento_separado_no_sustituye_contenido(client, headers, contacto,
     opcion.message.content = None
     opcion.message.reasoning = 'RAZONAMIENTO-SENTINELA'
     registrar = Mock()
-    monkeypatch.setattr(main.comunicaciones, 'registrar', registrar)
+    monkeypatch.setattr(comunicaciones, 'registrar', registrar)
     res = enviar(client, headers, contacto, 'SMS')
     assert res.status_code == 502
     registrar.assert_not_called()

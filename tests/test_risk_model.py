@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app import main, models
+from app import models
 from app.ml.features import FEATURE_COLUMNS, extraer_features_cliente
 from app.ml.train_model import MODEL_PATH, generar_dataset_sintetico
+from app.services import riesgo
 
 
 @pytest.fixture(scope='module')
@@ -92,11 +93,11 @@ def test_score_real_y_features_en_inferencia(db, modelo, monkeypatch, pct, dias)
                            fecha_pago=vencimiento + timedelta(days=atraso),
                            dias_atraso=atraso))
     db.flush()
-    monkeypatch.setattr(main, '_modelo_riesgo', modelo)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', modelo)
     features = extraer_features_cliente(db, cliente)
     assert features['pct_pagos_tarde'] == pct
     esperado = modelo.predict_proba(pd.DataFrame([features])[FEATURE_COLUMNS])[0, 1]
-    resultado = main.recalcular_riesgo(db, cliente)
+    resultado = riesgo.recalcular_riesgo(db, cliente)
     assert resultado['score_riesgo'] == round(1 - esperado, 3)
     assert resultado['probabilidad_pago_a_tiempo'] == round(esperado, 3)
     assert resultado['score_riesgo'] + resultado['probabilidad_pago_a_tiempo'] == pytest.approx(1)

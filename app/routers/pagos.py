@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from .. import main, models, auth
+from .. import models, auth
 from ..database import get_db
+from ..services import riesgo
 
 router = APIRouter(tags=["pagos"])
 
@@ -37,13 +38,13 @@ def registrar_pago(deuda_id: int, datos: PagoNuevo, db: Session = Depends(get_db
             dias_atraso=(date.today() - deuda.fecha_vencimiento).days, se_recuperó=True)
         db.add(pago)
         deuda.saldo_pendiente = float(saldo - datos.monto)
-        deuda.estatus = main.estado_deuda(deuda)
+        deuda.estatus = riesgo.estado_deuda(deuda)
         db.flush()
-        riesgo = main.recalcular_riesgo(db, cliente)
+        datos_riesgo = riesgo.recalcular_riesgo(db, cliente)
         db.commit()
-        return {"pago": main.pago_dict(pago), "nuevo_saldo": deuda.saldo_pendiente,
-                "saldo_cliente": main.resumen_cliente(cliente)["monto_pendiente"],
-                "estatus": deuda.estatus, **riesgo}
+        return {"pago": riesgo.pago_dict(pago), "nuevo_saldo": deuda.saldo_pendiente,
+                "saldo_cliente": riesgo.resumen_cliente(cliente)["monto_pendiente"],
+                "estatus": deuda.estatus, **datos_riesgo}
     except Exception:
         db.rollback()
         raise

@@ -1,15 +1,18 @@
 import os
 import json
 import hashlib
-import math
+import logging
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session, selectinload
 
-from .. import main, models, auth
+from .. import models, auth
 from ..database import get_db
+from ..services import riesgo, groq
 from ..services.recomendacion import recomendar_cliente
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ia"])
 
@@ -18,7 +21,7 @@ router = APIRouter(tags=["ia"])
 def evaluar_cartera(db: Session = Depends(get_db),
                     user: dict = Depends(auth.get_entra_user)):
     """Solo riesgo local. Cada cliente confirma o revierte su propia transacción."""
-    if main._modelo_riesgo is None:
+    if riesgo._modelo_riesgo is None:
         raise HTTPException(503, "El modelo predictivo local no está disponible.")
     ids = [id_ for (id_,) in db.query(models.Cliente.id).filter(
         models.Cliente.deudas.any(models.Deuda.saldo_pendiente > 0)
@@ -36,18 +39,18 @@ def evaluar_cartera(db: Session = Depends(get_db),
                     id=cliente_id).populate_existing().with_for_update().first()
                 if cliente is None or not any(d.saldo_pendiente > 0 for d in cliente.deudas):
                     resultado = "clientes_sin_deuda_omitidos"
-                elif main.evaluacion_riesgo_completa(cliente):
+                elif riesgo.evaluacion_riesgo_completa(cliente):
                     resultado = "clientes_ya_evaluados_omitidos"
                 else:
-                    main.recalcular_riesgo(db, cliente)
-                    if not main.evaluacion_riesgo_completa(cliente):
+                    riesgo.recalcular_riesgo(db, cliente)
+                    if not riesgo.evaluacion_riesgo_completa(cliente):
                         raise ValueError("Salida predictiva inválida")
                     resultado = "clientes_evaluados"
             # Contar solo después de confirmar la transacción, incluido flush.
             resumen[resultado] += 1
         except Exception as error:
             db.rollback()
-            main.logger.warning("No se pudo evaluar el cliente %s (%s)", cliente_id, type(error).__name__)
+            logger.warning("No se pudo evaluar el cliente %s (%s)", cliente_id, type(error).__name__)
             resumen["clientes_fallidos"] += 1
             resumen["errores"].append({"cliente_id": cliente_id,
                                       "motivo": "No se pudo guardar una evaluación predictiva válida."})
@@ -61,9 +64,9 @@ def calcular_riesgo_cliente(cliente_id: int, db: Session = Depends(get_db),
     if not cliente:
         raise HTTPException(404, "Cliente no encontrado")
     try:
-        riesgo = main.recalcular_riesgo(db, cliente)
+        datos_riesgo = riesgo.recalcular_riesgo(db, cliente)
         db.commit()
-        return {"cliente_id": cliente.id, "cliente_nombre": cliente.nombre, **riesgo}
+        return {"cliente_id": cliente.id, "cliente_nombre": cliente.nombre, **datos_riesgo}
     except Exception:
         db.rollback()
         raise
@@ -78,34 +81,34 @@ async def analizar_riesgo_cliente(cliente_id: int, regenerar: bool = False,
     if not cliente:
         raise HTTPException(404, "Cliente no encontrado")
     try:
-        if main.resumen_cliente(cliente)["sin_deuda_activa"]:
-            riesgo = main.recalcular_riesgo(db, cliente)
+        if riesgo.resumen_cliente(cliente)["sin_deuda_activa"]:
+            datos_riesgo = riesgo.recalcular_riesgo(db, cliente)
             db.commit()
-            return {**main.resumen_cliente(cliente), **riesgo, "historial_id": None,
+            return {**riesgo.resumen_cliente(cliente), **datos_riesgo, "historial_id": None,
                     "mensaje_empatico": None, "modo_generacion": None, "reutilizada": False}
         ultimo = db.query(models.HistorialMensaje).filter_by(cliente_id=cliente.id).order_by(
             models.HistorialMensaje.fecha_creacion.desc().nulls_last(), models.HistorialMensaje.id.desc()).first()
         # Consultar/procesar un cliente ya atendido no solicita otra estrategia.
         if ultimo and not regenerar:
-            return {**main.resumen_cliente(cliente), "historial_id": ultimo.id,
+            return {**riesgo.resumen_cliente(cliente), "historial_id": ultimo.id,
                     "mensaje_empatico": ultimo.mensaje_generado,
                     "modo_generacion": "groq" if ultimo.contexto_hash else "historico",
                     "reutilizada": True}
-        if main.client is None:
+        if groq.client is None:
             raise HTTPException(503, "Servicio de IA no configurado.")
-        riesgo = main.recalcular_riesgo(db, cliente)
+        datos_riesgo = riesgo.recalcular_riesgo(db, cliente)
         pagos = db.query(models.Pago).filter_by(cliente_id=cliente.id).order_by(
             models.Pago.fecha_pago.desc().nulls_last(), models.Pago.id.desc()).limit(8).all()
         contexto = {"fecha_actual": date.today(), "nombre": cliente.nombre,
-                    **riesgo,
+                    **datos_riesgo,
                     "recomendacion_recuperacion": recomendar_cliente(cliente),
-                    "deudas_activas": [main.deuda_dict(d) for d in sorted(cliente.deudas, key=lambda d: d.id) if d.saldo_pendiente > 0],
-                    "pagos_recientes": [main.pago_dict(p) for p in pagos],
-                    "sin_historial": riesgo["features_usadas"]["num_pagos_historicos"] == 0}
+                    "deudas_activas": [riesgo.deuda_dict(d) for d in sorted(cliente.deudas, key=lambda d: d.id) if d.saldo_pendiente > 0],
+                    "pagos_recientes": [riesgo.pago_dict(p) for p in pagos],
+                    "sin_historial": datos_riesgo["features_usadas"]["num_pagos_historicos"] == 0}
         serializado = json.dumps(contexto, sort_keys=True, ensure_ascii=False, default=str)
         huella = hashlib.sha256(serializado.encode()).hexdigest()
         try:
-            respuesta = await main.client.chat.completions.create(
+            respuesta = await groq.client.chat.completions.create(
                 model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
                 messages=[{"role": "system", "content": (
                     "Solo redacta exclusivamente un mensaje de cobranza breve, profesional, respetuoso, empático y no amenazante a partir del JSON estructurado del usuario. "
@@ -128,14 +131,14 @@ async def analizar_riesgo_cliente(cliente_id: int, regenerar: bool = False,
         except Exception:
             raise HTTPException(502, "No se pudo generar la estrategia con Groq. Intenta nuevamente.") from None
         registro = models.HistorialMensaje(cliente_id=cliente.id,
-            monto_al_momento=riesgo["features_usadas"]["monto_pendiente_actual"],
+            monto_al_momento=datos_riesgo["features_usadas"]["monto_pendiente_actual"],
             mensaje_generado=mensaje, contexto_hash=huella)
         db.add(registro)
         db.commit()
         return {"cliente_id": cliente.id, "cliente_nombre": cliente.nombre,
                 "folio": f"CL-{cliente.id:06d}", "monto_pendiente": registro.monto_al_momento,
                 "historial_id": registro.id, "modo_generacion": "groq", "reutilizada": False,
-                "mensaje_empatico": registro.mensaje_generado, **riesgo}
+                "mensaje_empatico": registro.mensaje_generado, **datos_riesgo}
     except Exception:
         db.rollback()
         raise

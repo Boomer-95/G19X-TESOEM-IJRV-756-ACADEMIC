@@ -2,8 +2,9 @@ from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 import pytest
-from app import main, models
+from app import models
 from app.ml.features import extraer_features_cliente
+from app.services import groq, riesgo
 
 
 @pytest.mark.parametrize('method,path', [
@@ -59,9 +60,9 @@ def test_riesgo(client, db, headers, monkeypatch, prob, segmento):
     agregar_deuda(db, c)
     class Modelo:
         def predict_proba(self, frame):
-            assert list(frame.columns) == main.FEATURE_COLUMNS
+            assert list(frame.columns) == riesgo.FEATURE_COLUMNS
             return [[1-prob, prob]]
-    monkeypatch.setattr(main, '_modelo_riesgo', Modelo())
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', Modelo())
     data = client.post(f'/ia/calcular-riesgo/{c.id}', headers=headers).json()
     assert data['score_riesgo'] == round(1-prob, 3)
     assert data['segmento'] == segmento
@@ -84,7 +85,7 @@ def test_groq_mock(client, db, headers, monkeypatch):
     c = crear_cliente(db)
     agregar_deuda(db, c)
     create = AsyncMock(return_value=SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='Mensaje PluriOne'), finish_reason='stop')]))
-    monkeypatch.setattr(main, 'client', SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)), close=AsyncMock()))
+    monkeypatch.setattr(groq, 'client', SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)), close=AsyncMock()))
     data = client.post(f'/ia/analizar-riesgo/{c.id}', headers=headers).json()
     assert data['mensaje_empatico'] == 'Mensaje PluriOne'
     assert data['modo_generacion'] == 'groq'
@@ -97,7 +98,7 @@ def test_groq_mock(client, db, headers, monkeypatch):
 def test_comunicacion(client, db, headers, canal, monkeypatch):
     create = AsyncMock(return_value=SimpleNamespace(choices=[SimpleNamespace(
         message=SimpleNamespace(content='Mensaje demo'), finish_reason='stop')]))
-    monkeypatch.setattr(main, 'client', SimpleNamespace(chat=SimpleNamespace(
+    monkeypatch.setattr(groq, 'client', SimpleNamespace(chat=SimpleNamespace(
         completions=SimpleNamespace(create=create)), close=AsyncMock()))
     c = crear_cliente(db)
     agregar_deuda(db, c)
@@ -114,14 +115,14 @@ def test_validaciones(client, headers, monkeypatch):
     assert client.post('/api/comunicaciones', headers=headers, json={'cliente_id': 1, 'canal': 'Fax', 'mensaje': 'x'}).status_code == 422
     assert client.post('/api/comunicaciones', headers=headers, json={'cliente_id': 1, 'canal': 'Email', 'mensaje': '  '}).status_code == 422
     assert client.post('/api/comunicaciones', headers=headers, json={'cliente_id': 999, 'canal': 'Email', 'mensaje': 'x'}).status_code == 404
-    monkeypatch.setattr(main, '_modelo_riesgo', None)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', None)
     assert client.post('/ia/calcular-riesgo/1', headers=headers).status_code == 404
 
 
 def test_modelo_existente(client, db, headers):
     c = crear_cliente(db)
     agregar_deuda(db, c)
-    assert main._modelo_riesgo is not None
+    assert riesgo._modelo_riesgo is not None
     res = client.post(f'/ia/calcular-riesgo/{c.id}', headers=headers)
     assert res.status_code == 200
     assert 0 <= res.json()['score_riesgo'] <= 1

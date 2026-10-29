@@ -8,7 +8,8 @@ import httpx
 import pytest
 from openai import AsyncOpenAI
 
-from app import main, models
+from app import models
+from app.services import comunicaciones, groq
 from app.services.diagnostico_groq import estructura_respuesta
 
 
@@ -53,12 +54,12 @@ def test_sdk_real_con_transporte_mock_y_diagnostico(client, db, headers, monkeyp
     sdk = AsyncOpenAI(api_key='CLAVE-FICTICIA-SENTINELA',
                       base_url='https://example.invalid/openai/v1', max_retries=0,
                       http_client=httpx.AsyncClient(transport=httpx.MockTransport(responder)))
-    monkeypatch.setattr(main, 'client', sdk)
+    monkeypatch.setattr(groq, 'client', sdk)
     registro = SimpleNamespace(id=7, cliente_id=cliente.id, canal='SMS', fecha_envio=date.today(),
         mensaje=contenido, exitoso=False, modo='simulado', estado='Simulado', provider=None)
     registrar = Mock(return_value=registro)
-    monkeypatch.setattr(main.comunicaciones, 'registrar', registrar)
-    caplog.set_level(logging.INFO, logger='app.main')
+    monkeypatch.setattr(comunicaciones, 'registrar', registrar)
+    caplog.set_level(logging.INFO, logger='app.routers.comunicaciones')
     res = client.post('/api/comunicaciones', headers=headers, json={
         'cliente_id': cliente.id, 'canal': 'SMS', 'mensaje': 'PROMPT-SENTINELA'})
     assert len(solicitudes) == 1
@@ -153,18 +154,18 @@ def test_modelo_sms_separado_y_reasoning_por_modelo(client, db, headers, monkeyp
     monkeypatch.setenv('GROQ_SMS_MODEL', modelo)
     crear = AsyncMock(return_value=SimpleNamespace(choices=[SimpleNamespace(
         finish_reason='stop', message=SimpleNamespace(content='Revisa tu saldo.'))]))
-    monkeypatch.setattr(main, 'client', SimpleNamespace(
+    monkeypatch.setattr(groq, 'client', SimpleNamespace(
         chat=SimpleNamespace(completions=SimpleNamespace(create=crear)), close=AsyncMock()))
     registro = SimpleNamespace(id=1, cliente_id=cliente.id, canal=canal,
         fecha_envio=date.today(), mensaje='Revisa tu saldo.', exitoso=False,
         modo='simulado', estado='Simulado', provider=None)
-    monkeypatch.setattr(main.comunicaciones, 'registrar', Mock(return_value=registro))
+    monkeypatch.setattr(comunicaciones, 'registrar', Mock(return_value=registro))
     res = client.post('/api/comunicaciones', headers=headers, json={
         'cliente_id': cliente.id, 'canal': canal, 'mensaje': 'Texto ficticio original.'})
     assert res.status_code == 201
     if canal in ('Email', 'WhatsApp'):
         crear.assert_not_awaited()
-        main.comunicaciones.registrar.assert_called_once_with(
+        comunicaciones.registrar.assert_called_once_with(
             db, cliente, canal, 'Texto ficticio original.')
         return
     crear.assert_awaited_once()

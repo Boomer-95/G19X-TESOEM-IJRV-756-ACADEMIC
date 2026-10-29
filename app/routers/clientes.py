@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
-from .. import auth, main, models
+from .. import auth, models
 from ..database import get_db
+from ..services import riesgo
 from ..services.analitica import cartera_actual
 from ..services.canal_sugerido import sugerir_canal
 from ..services.recomendacion import recomendar_cliente
@@ -37,8 +38,8 @@ def buscar_clientes(query: str = "", segmento: Literal["Alto riesgo", "Riesgo me
         consulta = consulta.filter(~condicion if analizado else condicion)
     clientes = consulta.all()
     if estatus_deuda:
-        clientes = [c for c in clientes if any(main.estado_deuda(d).lower() == estatus_deuda.lower() for d in c.deudas)]
-    filas = [main.resumen_cliente(c) for c in clientes]
+        clientes = [c for c in clientes if any(riesgo.estado_deuda(d).lower() == estatus_deuda.lower() for d in c.deudas)]
+    filas = [riesgo.resumen_cliente(c) for c in clientes]
     claves = {"prioridad": lambda c: -c["prioridad"], "saldo": lambda c: -c["monto_pendiente"],
               "atraso": lambda c: min(c["dias_restantes"] or 0, 0),
               "vencimiento": lambda c: c["fecha_vencimiento"] or date.max,
@@ -53,16 +54,16 @@ def detalle_cliente(cliente_id: int, db: Session = Depends(get_db),
     if not c:
         raise HTTPException(404, "Cliente no encontrado")
     ultimo = db.query(models.HistorialMensaje).filter_by(cliente_id=c.id).order_by(models.HistorialMensaje.fecha_creacion.desc().nulls_last(), models.HistorialMensaje.id.desc()).first()
-    return {**main.resumen_cliente(c), "email": c.email, "telefono": c.telefono,
+    return {**riesgo.resumen_cliente(c), "email": c.email, "telefono": c.telefono,
             "recomendacion_recuperacion": recomendar_cliente(c),
             "canal_sugerido": sugerir_canal(c),
             "tiene_estrategia": ultimo is not None,
             "fecha_ultima_estrategia": ultimo.fecha_creacion if ultimo else None,
             "monto_original_total": sum(d.monto_total for d in c.deudas),
             "numero_deudas": len(c.deudas),
-            "numero_deudas_vencidas": sum(main.estado_deuda(d) == "En Mora" for d in c.deudas),
-            "deudas": [main.deuda_dict(d) for d in sorted(c.deudas, key=lambda d: d.id)],
-            "pagos": [main.pago_dict(p) for p in sorted(c.pagos, key=lambda p: (p.fecha_pago or date.min, p.id), reverse=True)],
+            "numero_deudas_vencidas": sum(riesgo.estado_deuda(d) == "En Mora" for d in c.deudas),
+            "deudas": [riesgo.deuda_dict(d) for d in sorted(c.deudas, key=lambda d: d.id)],
+            "pagos": [riesgo.pago_dict(p) for p in sorted(c.pagos, key=lambda p: (p.fecha_pago or date.min, p.id), reverse=True)],
             "comunicaciones": [
                 {"id": registro.id, "canal": registro.canal, "fecha": registro.fecha_envio,
                  "mensaje": registro.mensaje, "exitoso": registro.exitoso,
@@ -82,7 +83,7 @@ def cartera_priorizada(
     user: dict = Depends(auth.get_entra_user),
 ):
     clientes = db.query(models.Cliente).options(selectinload(models.Cliente.deudas)).all()
-    return sorted([main.resumen_cliente(c) for c in clientes if any(d.saldo_pendiente > 0 for d in c.deudas)],
+    return sorted([riesgo.resumen_cliente(c) for c in clientes if any(d.saldo_pendiente > 0 for d in c.deudas)],
                   key=lambda c: c["prioridad"], reverse=True)
 
 

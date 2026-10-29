@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from app import main, auth
 from app.database import Base, get_db
+from app.services import groq
 
 
 @pytest.fixture
@@ -30,7 +31,7 @@ def client(db, monkeypatch):
         yield db
     main.app.dependency_overrides[get_db] = override_db
     monkeypatch.setattr(main, 'engine', db.get_bind())
-    monkeypatch.setattr(main, 'client', None)
+    monkeypatch.setattr(groq, 'client', None)
     with TestClient(main.app) as client:
         yield client
     main.app.dependency_overrides.clear()

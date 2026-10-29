@@ -10,12 +10,13 @@ import sys
 
 def comprobar_inferencia_demo(db, cliente_http):
     """Contrasta SQL restaurado, inferencia real y respuestas del backend."""
-    from app import main, models
+    from app import models
     from app.ml.features import FEATURE_COLUMNS, extraer_features_cliente
+    from app.services import riesgo
     from app.services.analitica import cartera_actual
 
-    assert main._modelo_riesgo is not None
-    assert main._columnas_modelo == FEATURE_COLUMNS
+    assert riesgo._modelo_riesgo is not None
+    assert riesgo._columnas_modelo == FEATURE_COLUMNS
     clientes = db.query(models.Cliente).order_by(models.Cliente.id).all()
     assert len(clientes) == 15
     respuesta = cliente_http.get('/api/clientes')
@@ -32,8 +33,8 @@ def comprobar_inferencia_demo(db, cliente_http):
             segmento = 'Sin deuda'
         else:
             features = extraer_features_cliente(db, c)
-            frame = main.pd.DataFrame([features])[FEATURE_COLUMNS]
-            p = float(main._modelo_riesgo.predict_proba(frame)[0][1])
+            frame = riesgo.pd.DataFrame([features])[FEATURE_COLUMNS]
+            p = float(riesgo._modelo_riesgo.predict_proba(frame)[0][1])
             probabilidad, score = round(p, 3), round(1 - p, 3)
             segmento = ('Bajo riesgo' if score < .33 else
                         'Riesgo medio' if score < .66 else 'Alto riesgo')

@@ -7,11 +7,12 @@ from sqlalchemy.exc import OperationalError
 
 from app import main
 from app.schema import DATABASE_ERROR, SCHEMA_ERROR, validar_esquema
+from app.services import groq
 
 
 def test_esquema_correcto_permite_arranque(db, monkeypatch):
     monkeypatch.setattr(main, 'engine', db.get_bind())
-    monkeypatch.setattr(main, 'client', None)
+    monkeypatch.setattr(groq, 'client', None)
     with TestClient(main.app):
         pass
 
@@ -38,7 +39,7 @@ def test_esquema_incompleto_aborta_sin_reparar(db, monkeypatch, sql):
     antes = {t: [c['name'] for c in inspect(bind).get_columns(t)]
              for t in inspect(bind).get_table_names()}
     monkeypatch.setattr(main, 'engine', bind)
-    monkeypatch.setattr(main, 'client', None)
+    monkeypatch.setattr(groq, 'client', None)
     with pytest.raises(RuntimeError, match='Ejecute: python -m app.migrate') as exc:
         with TestClient(main.app):
             pytest.fail('El backend no debe aceptar tráfico con esquema incompatible')

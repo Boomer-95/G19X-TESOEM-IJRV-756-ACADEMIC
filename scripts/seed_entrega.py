@@ -30,7 +30,7 @@ def preparar_entorno(url):
 
 def evaluar_clientes_demo(db, clientes):
     """Inferencia de producción después de persistir TODO el historial ficticio."""
-    from app.main import recalcular_riesgo
+    from app.services.riesgo import recalcular_riesgo
     db.flush()  # SessionLocal tiene autoflush=False; no evaluar datos incompletos.
     for posicion, cliente in enumerate(clientes, 1):
         if posicion in (13, 14):

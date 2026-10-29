@@ -97,12 +97,12 @@ def test_proteccion_url_rechaza_destinos_ajenos(url):
 def test_evaluar_cartera_demo_13_14(demo, monkeypatch):
     from unittest.mock import AsyncMock, Mock
     from types import SimpleNamespace
-    from app.services import twilio_service, sendgrid_service
+    from app.services import comunicaciones, groq as groq_service, riesgo, twilio_service, sendgrid_service
     db, cliente, _ = demo
     groq = AsyncMock()
-    monkeypatch.setattr(main, 'client', SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=groq)), close=AsyncMock()))
+    monkeypatch.setattr(groq_service, 'client', SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=groq)), close=AsyncMock()))
     externos = []
-    for modulo, nombre in [(main.comunicaciones, 'registrar'), (twilio_service, 'enviar_mensaje'),
+    for modulo, nombre in [(comunicaciones, 'registrar'), (twilio_service, 'enviar_mensaje'),
                            (twilio_service, 'enviar_llamada'), (sendgrid_service, 'enviar_email')]:
         funcion = Mock(side_effect=AssertionError('Llamada externa prohibida'))
         monkeypatch.setattr(modulo, nombre, funcion)
@@ -117,7 +117,7 @@ def test_evaluar_cartera_demo_13_14(demo, monkeypatch):
     for id_ in (13, 14):
         c = db.get(models.Cliente, id_)
         assert c.score_riesgo is None
-        esperados[id_] = main.recalcular_riesgo(db, c)
+        esperados[id_] = riesgo.recalcular_riesgo(db, c)
     db.rollback()
     datos = cliente.post('/api/cartera/evaluar').json()
     assert datos['clientes_activos_encontrados'] == 14

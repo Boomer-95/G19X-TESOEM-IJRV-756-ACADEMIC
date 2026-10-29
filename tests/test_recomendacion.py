@@ -3,7 +3,8 @@ from types import SimpleNamespace as Dato
 from unittest.mock import Mock
 
 import pytest
-from app import main, models
+from app import models
+from app.services import groq, riesgo
 from app.services.recomendacion import (
     _configuracion_segura,
     _generar_propuestas,
@@ -119,8 +120,8 @@ def test_ficha_solo_lectura_y_actualizacion_datos(client, db, headers, monkeypat
     db.add(c); db.commit()
     proveedor = Mock(side_effect=AssertionError('No llamar proveedor'))
     modelo = Mock(side_effect=AssertionError('No ejecutar ML'))
-    monkeypatch.setattr(main, 'client', proveedor)
-    monkeypatch.setattr(main, '_modelo_riesgo', modelo)
+    monkeypatch.setattr(groq, 'client', proveedor)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', modelo)
     url = f'/api/clientes/{c.id}'
     for _ in range(2):
         res = client.get(url, headers=headers)
@@ -137,7 +138,7 @@ def test_ficha_solo_lectura_y_actualizacion_datos(client, db, headers, monkeypat
     assert not proveedor.mock_calls
     assert not modelo.mock_calls
     # Evita que lifespan intente cerrar el objeto de prueba síncrono.
-    monkeypatch.setattr(main, 'client', None)
+    monkeypatch.setattr(groq, 'client', None)
 
 
 def test_propuestas_descuento_plazos_y_disclaimer():

@@ -6,24 +6,24 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from sqlalchemy import event
 
-from app import main, models
-from app.services import twilio_service, sendgrid_service
+from app import models
+from app.services import comunicaciones, groq, riesgo, twilio_service, sendgrid_service
 
 URL = '/api/cartera/evaluar'
 
 
 @pytest.fixture(autouse=True)
 def proveedores_prohibidos(monkeypatch):
-    groq = AsyncMock(side_effect=AssertionError('Groq prohibido'))
-    monkeypatch.setattr(main, 'client', SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=groq)), close=AsyncMock()))
+    groq_mock = AsyncMock(side_effect=AssertionError('Groq prohibido'))
+    monkeypatch.setattr(groq, 'client', SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=groq_mock)), close=AsyncMock()))
     llamadas = []
-    for modulo, nombre in [(main.comunicaciones, 'registrar'), (twilio_service, 'enviar_mensaje'),
+    for modulo, nombre in [(comunicaciones, 'registrar'), (twilio_service, 'enviar_mensaje'),
                            (twilio_service, 'enviar_llamada'), (sendgrid_service, 'enviar_email')]:
         funcion = Mock(side_effect=AssertionError('Proveedor prohibido'))
         monkeypatch.setattr(modulo, nombre, funcion)
         llamadas.append(funcion)
     yield
-    groq.assert_not_awaited()
+    groq_mock.assert_not_awaited()
     for funcion in llamadas:
         funcion.assert_not_called()
 
@@ -63,12 +63,12 @@ def test_evaluacion_solo_riesgo_y_repeticion(client, db, headers, monkeypatch, e
     # Ningún campo de deuda/pago/historial/comunicación debe cambiar.
     clases = [models.Deuda, models.Pago, models.HistorialMensaje, models.Comunicacion]
     antes = {clase: snapshot(db, clase) for clase in clases}
-    original = main.recalcular_riesgo
+    original = riesgo.recalcular_riesgo
     esperado = original(db, pendiente)
     db.rollback()  # Revertir el cálculo de referencia antes del POST.
     ids = [pendiente.id, existente.id, liquidado.id]
     inferencia = Mock(wraps=original)
-    monkeypatch.setattr(main, 'recalcular_riesgo', inferencia)
+    monkeypatch.setattr(riesgo, 'recalcular_riesgo', inferencia)
     respuesta = client.post(URL, headers=headers)
     assert respuesta.status_code == 200
     assert respuesta.json() == dict(clientes_activos_encontrados=2, clientes_evaluados=1,
@@ -90,7 +90,7 @@ def test_evaluacion_solo_riesgo_y_repeticion(client, db, headers, monkeypatch, e
 def test_rollback_individual_y_continuacion(client, db, headers, monkeypatch):
     malo = cliente(db); bueno = cliente(db)
     ids = [malo.id, bueno.id]
-    original = main.recalcular_riesgo
+    original = riesgo.recalcular_riesgo
     def evaluar(db, c):
         if c.id == ids[0]:
             c.score_riesgo = .99
@@ -98,7 +98,7 @@ def test_rollback_individual_y_continuacion(client, db, headers, monkeypatch):
             db.flush()  # Incluso escrituras parciales deben revertirse.
             raise RuntimeError('SECRETO-SENTINELA')
         return original(db, c)
-    monkeypatch.setattr(main, 'recalcular_riesgo', evaluar)
+    monkeypatch.setattr(riesgo, 'recalcular_riesgo', evaluar)
     respuesta = client.post(URL, headers=headers)
     assert respuesta.status_code == 200
     datos = respuesta.json()
@@ -108,7 +108,7 @@ def test_rollback_individual_y_continuacion(client, db, headers, monkeypatch):
     db.expire_all()
     assert db.get(models.Cliente, ids[0]).score_riesgo is None
     assert db.get(models.Cliente, ids[0]).segmento == 'No definido'
-    assert main.evaluacion_riesgo_completa(db.get(models.Cliente, ids[1]))
+    assert riesgo.evaluacion_riesgo_completa(db.get(models.Cliente, ids[1]))
 
 
 def test_fallo_al_guardar_no_cuenta_como_exito(client, db, headers):
@@ -133,7 +133,7 @@ def test_salida_invalida_se_revierte(client, db, headers, monkeypatch, probabili
     c = cliente(db); id_ = c.id
     modelo = Mock()
     modelo.predict_proba.return_value = [[1 - probabilidad, probabilidad]]
-    monkeypatch.setattr(main, '_modelo_riesgo', modelo)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', modelo)
     datos = client.post(URL, headers=headers).json()
     assert datos['clientes_fallidos'] == 1 and datos['clientes_evaluados'] == 0
     db.expire_all()
@@ -149,7 +149,7 @@ def test_evaluacion_incompleta_se_procesa(client, db, headers, campo, valor):
 
 def test_modelo_ausente_no_escribe(client, db, headers, monkeypatch):
     c = cliente(db); id_ = c.id
-    monkeypatch.setattr(main, '_modelo_riesgo', None)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', None)
     assert client.post(URL, headers=headers).status_code == 503
     assert db.get(models.Cliente, id_).score_riesgo is None
 

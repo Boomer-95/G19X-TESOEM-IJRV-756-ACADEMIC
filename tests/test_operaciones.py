@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, text, inspect
 from app import main, models, seed
 from app.ml import seed_historial
 from app.migrate import migrar
+from app.services import comunicaciones, groq as groq_service, riesgo
 
 
 @pytest.fixture
@@ -23,7 +24,7 @@ def cartera(db):
 def groq(monkeypatch, contenido='Estrategia de prueba — Cobranza Inteligente PluriOne', error=None):
     create = AsyncMock(side_effect=error, return_value=SimpleNamespace(choices=[SimpleNamespace(
         message=SimpleNamespace(content=contenido), finish_reason='stop')]))
-    monkeypatch.setattr(main, 'client', SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)), close=AsyncMock()))
+    monkeypatch.setattr(groq_service, 'client', SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)), close=AsyncMock()))
     return create
 
 
@@ -106,7 +107,7 @@ def test_pago_y_modelo(client, db, headers, cartera, monkeypatch, indice, monto,
             assert frame.iloc[0]['monto_pendiente_actual'] == saldo + 1000
             assert frame.iloc[0]['num_deudas_activas'] == (1 if saldo == 0 else 2)
             return [[.25,.75]]
-    monkeypatch.setattr(main, '_modelo_riesgo', Modelo())
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', Modelo())
     data = client.post(f'/api/deudas/{deuda.id}/pagos', json={'monto': monto}, headers=headers)
     assert data.status_code == 201, data.text
     data = data.json()
@@ -137,7 +138,7 @@ def test_pago_invalido(client, db, headers, cartera, monto):
 
 def test_pago_inexistente_y_rollback(client, db, headers, cartera, monkeypatch):
     assert client.post('/api/deudas/999/pagos', json={'monto': 1}, headers=headers).status_code == 404
-    monkeypatch.setattr(main, '_modelo_riesgo', None)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', None)
     d = cartera[0].deudas[0]
     assert client.post(f'/api/deudas/{d.id}/pagos', json={'monto': 100}, headers=headers).status_code == 503
     db.refresh(d)
@@ -194,8 +195,8 @@ def test_pago_hoy_con_modelo_real(client, db, headers, cartera):
     assert res.json()['nuevo_saldo'] == 999.99
     assert res.json()['pago']['dias_atraso'] == 0
     assert res.json()['estatus'] == 'Pendiente'
-    features = main.extraer_features_cliente(db, c)
-    expected = main._modelo_riesgo.predict_proba(main.pd.DataFrame([features])[main._columnas_modelo])[0][1]
+    features = riesgo.extraer_features_cliente(db, c)
+    expected = riesgo._modelo_riesgo.predict_proba(riesgo.pd.DataFrame([features])[riesgo._columnas_modelo])[0][1]
     assert res.json()['probabilidad_pago_a_tiempo'] == round(float(expected), 3)
 
 
@@ -251,7 +252,7 @@ def test_seleccion_solo_consulta(client, db, headers, cartera, monkeypatch, con_
     c = cartera[0]
     create = groq(monkeypatch)
     modelo = Mock()
-    monkeypatch.setattr(main, '_modelo_riesgo', modelo)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', modelo)
     if con_estrategia:
         for mensaje in ['Anterior', 'Última almacenada']:
             db.add(models.HistorialMensaje(cliente_id=c.id, monto_al_momento=2000,
@@ -283,7 +284,7 @@ def test_sin_deuda_no_modelo_ni_groq(client, db, headers, monkeypatch, ruta, con
     db.commit()
     create = groq(monkeypatch) if configurado else None
     modelo = Mock() if configurado else None
-    monkeypatch.setattr(main, '_modelo_riesgo', modelo)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', modelo)
     metodo = client.get if ruta.startswith('/api') else client.post
     res = metodo(ruta.format(id=c.id), headers=headers)
     assert res.status_code == 200
@@ -310,7 +311,7 @@ def test_sin_deuda_no_modelo_ni_groq(client, db, headers, monkeypatch, ruta, con
 
 def test_liquidar_ultima_deuda_sin_modelo(client, db, headers, cartera, monkeypatch):
     c = cartera[1]
-    monkeypatch.setattr(main, '_modelo_riesgo', None)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', None)
     create = groq(monkeypatch)
     assert client.get('/api/metricas', headers=headers).json()['deudores_activos'] == 2
     res = client.post(f'/api/deudas/{c.deudas[0].id}/pagos', json={'monto': 1000}, headers=headers)
@@ -373,7 +374,7 @@ def test_sin_deuda_no_comunicacion_de_cobranza(client, db, headers, monkeypatch,
     db.commit()
     create = groq(monkeypatch)
     registrar = Mock(side_effect=AssertionError('No contactar cliente liquidado'))
-    monkeypatch.setattr(main.comunicaciones, 'registrar', registrar)
+    monkeypatch.setattr(comunicaciones, 'registrar', registrar)
     resultado = client.post('/api/comunicaciones', headers=headers,
         json={'cliente_id': c.id, 'canal': canal, 'mensaje': 'Mensaje de cobranza'})
     assert resultado.status_code == 409
@@ -416,7 +417,7 @@ def test_groq_recibe_propuestas_exactas_en_plan_de_pagos(client, db, headers, mo
     class ModeloBajoRiesgo:
         def predict_proba(self, _frame):
             return [[0.2, 0.8]]
-    monkeypatch.setattr(main, '_modelo_riesgo', ModeloBajoRiesgo())
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', ModeloBajoRiesgo())
     c = models.Cliente(nombre='Cliente Plan Pagos', email='plan@example.invalid')
     db.add(c)
     db.flush()

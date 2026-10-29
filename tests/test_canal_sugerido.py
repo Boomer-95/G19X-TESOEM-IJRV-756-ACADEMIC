@@ -5,7 +5,8 @@ from unittest.mock import Mock
 
 import pytest
 from sqlalchemy import event
-from app import main, models
+from app import models
+from app.services import comunicaciones, groq, riesgo
 from app.services.canal_sugerido import sugerir_canal
 
 HOY = date(2026, 10, 21)
@@ -203,11 +204,11 @@ def test_get_sin_escrituras_ml_ni_proveedores(client, db, headers, monkeypatch):
     event.listen(db.get_bind(), 'before_cursor_execute', observar)
     proveedor = Mock(side_effect=AssertionError('Proveedor prohibido'))
     modelo = Mock(side_effect=AssertionError('ML prohibido'))
-    monkeypatch.setattr(main, 'client', proveedor)
-    monkeypatch.setattr(main, '_modelo_riesgo', modelo)
-    monkeypatch.setattr(main.comunicaciones, 'registrar', proveedor)
-    monkeypatch.setattr(main.comunicaciones.twilio_service, 'enviar_mensaje', proveedor)
-    monkeypatch.setattr(main.comunicaciones.sendgrid_service, 'enviar_email', proveedor)
+    monkeypatch.setattr(groq, 'client', proveedor)
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', modelo)
+    monkeypatch.setattr(comunicaciones, 'registrar', proveedor)
+    monkeypatch.setattr(comunicaciones.twilio_service, 'enviar_mensaje', proveedor)
+    monkeypatch.setattr(comunicaciones.sendgrid_service, 'enviar_email', proveedor)
     try:
         for _ in range(2):
             res = client.get(f'/api/clientes/{c.id}', headers=headers)
@@ -218,4 +219,4 @@ def test_get_sin_escrituras_ml_ni_proveedores(client, db, headers, monkeypatch):
         assert not proveedor.mock_calls and not modelo.mock_calls
     finally:
         event.remove(db.get_bind(), 'before_cursor_execute', observar)
-        monkeypatch.setattr(main, 'client', None)
+        monkeypatch.setattr(groq, 'client', None)

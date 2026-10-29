@@ -7,8 +7,10 @@ from openai import APIConnectionError, APIError, APIStatusError, APITimeoutError
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
-from .. import main, models, auth
+from .. import models, auth
 from ..database import get_db
+from ..services import comunicaciones, diagnostico_groq, groq, mensajes, riesgo
+from ..services.configuracion import estado_proveedores
 
 logger = logging.getLogger(__name__)
 
@@ -46,17 +48,17 @@ async def registrar_comunicacion(
     mensaje_envio = datos.mensaje
 
     # La protección de cobranza también se aplica a llamadas directas a la API.
-    if main.resumen_cliente(cliente)["sin_deuda_activa"]:
+    if riesgo.resumen_cliente(cliente)["sin_deuda_activa"]:
         raise HTTPException(409, "El cliente no tiene deuda activa; no se requiere comunicación de cobranza.")
 
     # Solo SMS y Llamada requieren una versión corta.
     # Email y WhatsApp conservan exactamente el mensaje original.
     if datos.canal in ("SMS", "Llamada"):
-        if main.client is None:
+        if groq.client is None:
             raise HTTPException(503, "Servicio de IA no configurado.")
 
         if datos.canal == "SMS":
-            instruccion = main.SMS_INSTRUCCION
+            instruccion = mensajes.SMS_INSTRUCCION
             # Tokens no equivalen a caracteres: dejar margen de generación y
             # aplicar el límite SMS sobre el texto utilizable normalizado, aun
             # cuando el proveedor termine por length. Sin aumentar el presupuesto.
@@ -92,7 +94,7 @@ async def registrar_comunicacion(
             {"openai/gpt-oss-20b", "openai/gpt-oss-120b"} else {}
         )
         try:
-            respuesta = await main.client.chat.completions.create(
+            respuesta = await groq.client.chat.completions.create(
                 model=modelo_adaptacion,
                 messages=[
                     {"role": "system", "content": instruccion},
@@ -114,34 +116,34 @@ async def registrar_comunicacion(
                              429: 'RateLimited'}.get(exc.status_code, 'ProviderHttpError')
             else:
                 categoria = 'ProviderError'
-            main.logger.warning('GroqGenerationFailed canal=%s reason=%s', datos.canal, categoria)
+            logger.warning('GroqGenerationFailed canal=%s reason=%s', datos.canal, categoria)
             raise HTTPException(502, f"No se pudo generar el mensaje corto para {datos.canal}.") from None
         except Exception:
             # Frontera del cliente externo; no confundir errores de red/SDK
             # con validación local ni registrar excepciones que puedan tener secretos.
-            main.logger.error('GroqGenerationFailed canal=%s reason=UnexpectedClientError', datos.canal)
+            logger.error('GroqGenerationFailed canal=%s reason=UnexpectedClientError', datos.canal)
             raise HTTPException(502, f"No se pudo generar el mensaje corto para {datos.canal}.") from None
 
         try:
             if datos.canal == "SMS":
-                mensaje_envio = main.adaptar_sms(respuesta)
+                mensaje_envio = mensajes.adaptar_sms(respuesta)
             else:
-                mensaje_envio = main.extraer_adaptacion(respuesta)
-        except main.AdaptacionInvalida as exc:
+                mensaje_envio = mensajes.extraer_adaptacion(respuesta)
+        except mensajes.AdaptacionInvalida as exc:
             categoria = 'SmsAdaptationFailed' if datos.canal == 'SMS' else 'VoiceAdaptationFailed'
-            main.logger.warning('%s reason=%s', categoria, exc.codigo)
-            main.logger.warning('GroqAdaptationResponse canal=%s reason=%s structure=%s', datos.canal, exc.codigo,
-                           json.dumps(main.estructura_respuesta(respuesta, modelo_adaptacion, max_tokens)))
+            logger.warning('%s reason=%s', categoria, exc.codigo)
+            logger.warning('GroqAdaptationResponse canal=%s reason=%s structure=%s', datos.canal, exc.codigo,
+                           json.dumps(diagnostico_groq.estructura_respuesta(respuesta, modelo_adaptacion, max_tokens)))
             raise HTTPException(
                 502,
                 f"No se pudo generar el mensaje corto para {datos.canal}."
             ) from None
 
-        main.logger.info('GroqAdaptationResponse canal=%s structure=%s', datos.canal,
-                    json.dumps(main.estructura_respuesta(respuesta, modelo_adaptacion, max_tokens)))
+        logger.info('GroqAdaptationResponse canal=%s structure=%s', datos.canal,
+                    json.dumps(diagnostico_groq.estructura_respuesta(respuesta, modelo_adaptacion, max_tokens)))
 
-    return main.comunicaciones.respuesta(
-        main.comunicaciones.registrar(
+    return comunicaciones.respuesta(
+        comunicaciones.registrar(
             db,
             cliente,
             datos.canal,
@@ -153,4 +155,4 @@ async def registrar_comunicacion(
 
 @router.get("/api/integraciones/estado")
 def integraciones_estado(user: dict = Depends(auth.get_entra_user)):
-    return main.estado_proveedores()
+    return estado_proveedores()
