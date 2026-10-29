@@ -1,6 +1,6 @@
 # MVP v1 · Motor Inteligente de Cobranza para PluriOne
 
-**Versión documental:** 1.0 · 6 de octubre de 2026.
+**Versión documental:** 1.0 · 29 de octubre de 2026.
 
 **Alcance:** código local actual; demostración académica asistida por un usuario autorizado.
 
@@ -25,6 +25,7 @@ La automatización se limita a cálculos, generación/adaptación, solicitudes a
 | Pagos | Registro parcial/total con validación, transacción, historial y recálculo de riesgo cuando corresponde. |
 | Riesgo predictivo | Random Forest scikit-learn local con seis features; umbrales y prioridad score × saldo. |
 | Estrategias IA | Generación Groq, reutilización y regeneración explícita; versiones históricas conservadas. |
+| Recomendación de recuperación con propuestas concretas | Regla determinista (`app/services/recomendacion.py`, ver [Recomendación de recuperación](RECOMENDACION_RECUPERACION.md)) que evalúa riesgo, saldo, atraso y pagos puntuales; cuando corresponde según las reglas de recuperación para atrasos de 30 a 89 días y saldo > $1,000 MXN, genera propuesta de pronto pago (descuento calculado con límite máximo de 10 %, saldo propuesto y vigencia en días) y alternativas de plan de pagos (3, 6 o 12 meses según umbrales y cuota mensual calculada), con cálculos monetarios en `Decimal`, condiciones configurables mediante variables de entorno y propuestas informativas sujetas a revisión y autorización humana (no modifican la deuda). |
 | Sugerencia de canal basada en asociación temporal histórica | Regla observacional (`app/services/canal_sugerido.py`) sobre entregas/lecturas, fallos y pagos dentro de la ventana temporal; preselecciona el canal en la ficha manteniendo la elección manual. No es un modelo predictivo de IA ni demuestra causalidad. |
 | Comunicaciones | Email, SMS y WhatsApp opcionales; simulación disponible; texto editable y vínculo de estrategia. Llamada solo como guion simulado. |
 | Estados de proveedor | Twilio con callbacks firmados; SendGrid con aceptación sin confirmación de entrega. |
@@ -103,14 +104,14 @@ Este documento no ejecuta de nuevo las suites ni certifica las cuentas externas.
 | MVP v1 implementado | Post-MVP propuesto, no implementado |
 | --- | --- |
 | Priorización score × saldo, sugerencia observacional de canal por asociación temporal histórica y elección final por usuario | Modelo predictivo de IA para selección de canal con validación empresarial y atribución causal. |
-| Estrategias revisadas por el usuario y propuestas informativas sujetas a revisión humana | Aplicación automatizada de descuentos y reestructuración con motor de políticas y autorización. |
+| Estrategias revisadas por el usuario y recomendación de recuperación con propuestas informativas de pronto pago y plan de pagos sujetas a revisión y autorización humana | Aplicación automatizada en firme de descuentos, convenios y reestructuración sobre la deuda con motor de políticas y flujo de autorización. |
 | Random Forest entrenado con datos sintéticos | Modelos con datos empresariales autorizados, evaluación temporal y calibración. |
 | Acceso Entra por scope | Roles avanzados y permisos por operación/cartera. |
 | PostgreSQL y consultas propias | ERP/CRM, intercambio controlado de cartera y BI externo. |
 | Capturas al consultar y acciones manuales | Programación diaria, campañas con aprobación y supervisión. |
 | Docker y CI de verificación | Despliegue productivo con TLS, monitoreo, respaldo y recuperación probada. |
 
-Posibles versiones posteriores: v1.1 para robustez monetaria, idempotencia y rendimiento; v2 para integración empresarial y modelo validado; una fase posterior para recomendaciones autorizadas y automatización supervisada. Son una propuesta de evolución, sin fechas comprometidas ni capacidades disponibles hoy.
+Posibles versiones posteriores: v1.1 para robustez monetaria, idempotencia y rendimiento; v2 para integración empresarial y modelo validado; una fase posterior para aplicación en firme de convenios autorizados y automatización supervisada. Son una propuesta de evolución, sin fechas comprometidas ni capacidades disponibles hoy.
 
 ## Documentos relacionados
 
