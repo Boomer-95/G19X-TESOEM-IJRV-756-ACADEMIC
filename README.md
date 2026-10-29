@@ -46,4 +46,13 @@ Configuración, endpoints, desarrollo local, migraciones, proveedores y regenera
 
 ## Uso de asistentes de IA durante el desarrollo
 
-Se utilizaron asistentes de IA como apoyo para revisión de código, generación/refactorización asistida, propuestas de pruebas, documentación y análisis de errores. El proyecto fue revisado y probado por el responsable; los resultados se verificaron con tests y ejecución local. El uso del asistente no sustituye la responsabilidad sobre el código entregado.
+Durante el desarrollo del proyecto PluriOne – Motor Inteligente de Cobranza, se utilizaron diferentes herramientas de Inteligencia Artificial como apoyo para las actividades de análisis, construcción, documentación y revisión del sistema.
+
+ChatGPT:
+Se utilizó como herramienta de apoyo durante la construcción del proyecto. Permitió resolver dudas técnicas, analizar errores, explicar conceptos de programación y arquitectura, proponer soluciones y apoyar en la elaboración y mejora de diferentes componentes del sistema. También se utilizó para comprender tecnologías como React, FastAPI, PostgreSQL, scikit-learn, Docker, autenticación mediante Microsoft Entra ID y la integración con servicios de inteligencia artificial.
+
+Gemini:
+Se utilizó como apoyo para el análisis y construcción del proyecto, principalmente para revisar requerimientos, analizar avances, organizar tareas y generar propuestas para implementar o mejorar funcionalidades. También se utilizó como apoyo para revisar que las modificaciones realizadas fueran coherentes con los objetivos y requisitos establecidos para el proyecto.
+
+Claude:
+Se utilizó principalmente como herramienta de auditoría y revisión técnica. Su función fue analizar el proyecto después de determinadas etapas de desarrollo, identificar posibles problemas, dependencias innecesarias, riesgos técnicos y aspectos pendientes de acuerdo con los requisitos establecidos. Sus observaciones fueron utilizadas como referencia para realizar correcciones y mejoras.
