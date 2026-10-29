@@ -75,16 +75,16 @@ que la identidad corresponde a la cuenta dedicada, sin publicar sus datos.
 
 ## Checklist antes de entregar
 
-- [ ] Crear o confirmar cuenta Microsoft dedicada de evaluación.
-- [ ] Confirmar que puede iniciar sesión en el tenant.
-- [ ] Confirmar que Assignment required = No, o que la cuenta tenga asignación si aplica.
-- [ ] Confirmar redirect URI http://localhost:8080/
-- [ ] Confirmar scope `api://<CLIENT_ID>/access_as_user`.
-- [ ] Probar desde una ventana de incógnito.
-- [ ] Confirmar acceso al dashboard y HTTP 200 en la petición autenticada a `/auth/me`.
-- [ ] Cerrar sesión y repetir una segunda vez.
-- [ ] Subir usuario/contraseña SOLO en TODO Academy → Técnicos → Accesos de prueba (dentro de Mis documentos).
-- [ ] Confirmar que ninguna credencial aparece en GitHub.
+- [X] Crear o confirmar cuenta Microsoft dedicada de evaluación.
+- [X] Confirmar que puede iniciar sesión en el tenant.
+- [X] Confirmar que Assignment required = No, o que la cuenta tenga asignación si aplica.
+- [X] Confirmar redirect URI http://localhost:8080/
+- [X] Confirmar scope `api://<CLIENT_ID>/access_as_user`.
+- [X] Probar desde una ventana de incógnito.
+- [X] Confirmar acceso al dashboard y HTTP 200 en la petición autenticada a `/auth/me`.
+- [X] Cerrar sesión y repetir una segunda vez.
+- [X] Subir usuario/contraseña SOLO en TODO Academy → Técnicos → Accesos de prueba (dentro de Mis documentos).
+- [X] Confirmar que ninguna credencial aparece en GitHub.
 
 Si el registro exige asignación, asignar la cuenta dedicada sin relajar esa
 política. Mantener las políticas de seguridad del tenant; si algún requisito
