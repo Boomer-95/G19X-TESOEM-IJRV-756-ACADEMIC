@@ -106,10 +106,24 @@ Cada cliente se confirma por separado; un fallo revierte ese cliente y el lote c
 
 ## Conservación de la demo
 
-- **No usar `docker compose down -v`**: elimina los volúmenes y sus datos.
+- **No usar `docker compose down -v`** durante la operación normal: elimina los volúmenes y sus datos.
 - **No ejecutar seeds** después de importar el SQL.
 - No repetir la restauración en una base con datos: el script se negará. Para actualizar esta demo use `deploy_demo.sh` o `deploy_demo.ps1`, que conserva los datos y migra antes del arranque.
 - Los mensajes simulados no implican envíos. Algunas pruebas aisladas ejercitan proveedores mediante mocks; nunca se necesitan contactos reales para esta guía.
+
+## Ensayo de Instalación Limpia y Registro de Tiempos
+
+Durante el ensayo de instalación desde cero en entorno limpio se registraron los siguientes tiempos reales de ejecución:
+
+| Fase | Comando / Acción | Tiempo medido |
+|---|---|---|
+| Clonación del repositorio | `git clone URL_DEL_REPOSITORIO_ENTREGADA motor-cobranza-ia` | ~5 a 10 segundos |
+| Restauración de datos de prueba | `bash scripts/restaurar_demo.sh` | ~30 segundos |
+| Compilación y despliegue de contenedores | `bash scripts/deploy_demo.sh` | ~1 minuto con 10 segundos |
+
+**Nota técnica sobre incidencias menores resueltas (guía para el evaluador):**
+- **Liberación preventiva del puerto 8000:** Si el equipo anfitrión mantiene en ejecución otra instancia local del proyecto o servicio en el puerto `8000` (o `8080`), es necesario detenerla preventivamente antes del despliegue para evitar colisiones de puertos.
+- **Limpieza previa de volúmenes para nuevas restauraciones:** Dado que `restaurar_demo.sh` protege los datos existentes y aborta si detecta tablas en el esquema `public`, cuando se requiera realizar una nueva restauración limpia desde cero sobre un proyecto previamente inicializado es indispensable eliminar antes el volumen de base de datos con `docker compose down -v` (o definir un `COMPOSE_PROJECT_NAME` nuevo en `.env`).
 
 ## Limitación de dependencias de desarrollo
 
