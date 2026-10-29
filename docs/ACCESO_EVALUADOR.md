@@ -23,7 +23,7 @@ El usuario y la contraseña de la cuenta dedicada **no se almacenan en GitHub**,
 ni en Markdown, código, SQL, `.env.example`, issues, workflows o capturas públicas.
 Se entregan exclusivamente mediante:
 
-**TODO Academy → Mis documentos → Técnicos → Accesos de prueba**.
+**TODO Academy → Mis documentos → Técnicos → Accesos de prueba → PERFIL.md**.
 
 La configuración necesaria para la instalación se comparte por ese mismo canal
 privado y se completa localmente según la [guía demo](GUIA_DEMO_ASESOR.md). No
