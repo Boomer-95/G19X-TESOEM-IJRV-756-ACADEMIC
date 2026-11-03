@@ -21,8 +21,10 @@ router = APIRouter(tags=["ia"])
 def evaluar_cartera(db: Session = Depends(get_db),
                     user: dict = Depends(auth.get_entra_user)):
     """Solo riesgo local. Cada cliente confirma o revierte su propia transacción."""
-    if riesgo._modelo_riesgo is None:
-        raise HTTPException(503, "El modelo predictivo local no está disponible.")
+    try:
+        riesgo.verificar_modelo_disponible()
+    except riesgo.ModeloNoEntrenado as exc:
+        raise HTTPException(503, "El modelo predictivo local no está disponible.") from exc
     ids = [id_ for (id_,) in db.query(models.Cliente.id).filter(
         models.Cliente.deudas.any(models.Deuda.saldo_pendiente > 0)
     ).order_by(models.Cliente.id).all()]
@@ -67,6 +69,9 @@ def calcular_riesgo_cliente(cliente_id: int, db: Session = Depends(get_db),
         datos_riesgo = riesgo.recalcular_riesgo(db, cliente)
         db.commit()
         return {"cliente_id": cliente.id, "cliente_nombre": cliente.nombre, **datos_riesgo}
+    except riesgo.ModeloNoEntrenado as exc:
+        db.rollback()
+        raise HTTPException(503, str(exc)) from exc
     except Exception:
         db.rollback()
         raise
@@ -139,6 +144,9 @@ async def analizar_riesgo_cliente(cliente_id: int, regenerar: bool = False,
                 "folio": f"CL-{cliente.id:06d}", "monto_pendiente": registro.monto_al_momento,
                 "historial_id": registro.id, "modo_generacion": "groq", "reutilizada": False,
                 "mensaje_empatico": registro.mensaje_generado, **datos_riesgo}
+    except riesgo.ModeloNoEntrenado as exc:
+        db.rollback()
+        raise HTTPException(503, str(exc)) from exc
     except Exception:
         db.rollback()
         raise

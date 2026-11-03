@@ -45,6 +45,9 @@ def registrar_pago(deuda_id: int, datos: PagoNuevo, db: Session = Depends(get_db
         return {"pago": riesgo.pago_dict(pago), "nuevo_saldo": deuda.saldo_pendiente,
                 "saldo_cliente": riesgo.resumen_cliente(cliente)["monto_pendiente"],
                 "estatus": deuda.estatus, **datos_riesgo}
+    except riesgo.ModeloNoEntrenado as exc:
+        db.rollback()
+        raise HTTPException(503, str(exc)) from exc
     except Exception:
         db.rollback()
         raise

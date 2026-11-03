@@ -1,11 +1,18 @@
+import logging
 import math
 import os
 from datetime import date
-from fastapi import HTTPException
 import joblib
 import pandas as pd
 
 from ..ml.features import extraer_features_cliente, FEATURE_COLUMNS
+
+logger = logging.getLogger(__name__)
+
+
+class ModeloNoEntrenado(RuntimeError):
+    """Excepción de dominio cuando el modelo de riesgo no está entrenado o disponible."""
+
 
 MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ml", "risk_model.joblib")
 _modelo_riesgo = None
@@ -15,9 +22,14 @@ if os.path.exists(MODEL_PATH):
     _bundle = joblib.load(MODEL_PATH)
     _modelo_riesgo = _bundle["modelo"]
     _columnas_modelo = _bundle["columnas"]
-    print("✅ Modelo de riesgo cargado correctamente.")
+    logger.info("Modelo de riesgo cargado correctamente.")
 else:
-    print("⚠️  No se encontró app/ml/risk_model.joblib. Corre 'python -m app.ml.train_model'.")
+    logger.warning("No se encontró app/ml/risk_model.joblib. Corre 'python -m app.ml.train_model'.")
+
+
+def verificar_modelo_disponible():
+    if _modelo_riesgo is None:
+        raise ModeloNoEntrenado("El modelo de riesgo no está entrenado. Corre 'python -m app.ml.train_model'.")
 
 
 def recalcular_riesgo(db, cliente):
@@ -29,8 +41,7 @@ def recalcular_riesgo(db, cliente):
         return {"features_usadas": features, "saldo_pendiente": 0,
                 "sin_deuda_activa": True, "probabilidad_pago_a_tiempo": None,
                 "score_riesgo": None, "segmento": "Sin deuda"}
-    if _modelo_riesgo is None:
-        raise HTTPException(503, "El modelo de riesgo no está entrenado. Corre 'python -m app.ml.train_model'.")
+    verificar_modelo_disponible()
     frame = pd.DataFrame([features])[_columnas_modelo]
     probabilidad = float(_modelo_riesgo.predict_proba(frame)[0][1])
     cliente.probabilidad_pago_a_tiempo = round(probabilidad, 3)

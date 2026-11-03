@@ -119,10 +119,14 @@ def test_validaciones(client, headers, monkeypatch):
     assert client.post('/ia/calcular-riesgo/1', headers=headers).status_code == 404
 
 
-def test_modelo_existente(client, db, headers):
+def test_modelo_existente(client, db, headers, monkeypatch):
     c = crear_cliente(db)
     agregar_deuda(db, c)
     assert riesgo._modelo_riesgo is not None
     res = client.post(f'/ia/calcular-riesgo/{c.id}', headers=headers)
     assert res.status_code == 200
     assert 0 <= res.json()['score_riesgo'] <= 1
+    monkeypatch.setattr(riesgo, '_modelo_riesgo', None)
+    with pytest.raises(riesgo.ModeloNoEntrenado):
+        riesgo.recalcular_riesgo(db, c)
+    assert client.post(f'/ia/calcular-riesgo/{c.id}', headers=headers).status_code == 503

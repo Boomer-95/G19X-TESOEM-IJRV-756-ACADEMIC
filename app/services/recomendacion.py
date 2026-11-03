@@ -9,38 +9,34 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from math import isfinite
 
 
+def _leer_decimal(nombre, defecto, minimo, maximo=None):
+    defecto_dec = Decimal(str(defecto))
+    min_dec = Decimal(str(minimo))
+    max_dec = Decimal(str(maximo)) if maximo is not None else None
+    try:
+        valor = Decimal(os.getenv(nombre, str(defecto_dec)))
+        if valor.is_finite() and valor > min_dec and (max_dec is None or valor <= max_dec):
+            return valor
+    except (InvalidOperation, ValueError, TypeError):
+        pass
+    return defecto_dec
+
+
+def _leer_entero(nombre, defecto, minimo, maximo=None):
+    try:
+        valor = int(os.getenv(nombre, str(defecto)))
+        if valor > minimo and (maximo is None or valor <= maximo):
+            return valor
+    except (ValueError, TypeError):
+        pass
+    return int(defecto)
+
+
 def _configuracion_segura():
-    pct = Decimal("10.0")
-    try:
-        val_pct = Decimal(os.getenv("RECOMENDACION_DESCUENTO_PCT", "10.0"))
-        if val_pct.is_finite() and Decimal("0") < val_pct <= Decimal("10.0"):
-            pct = val_pct
-    except (InvalidOperation, ValueError, TypeError):
-        pct = Decimal("10.0")
-
-    dias = 5
-    try:
-        val_dias = int(os.getenv("RECOMENDACION_DESCUENTO_DIAS", "5"))
-        if val_dias > 0:
-            dias = val_dias
-    except (InvalidOperation, ValueError, TypeError):
-        dias = 5
-
-    umbral1 = Decimal("5000.0")
-    try:
-        val_u1 = Decimal(os.getenv("RECOMENDACION_UMBRAL_PLAZO_1", "5000.0"))
-        if val_u1.is_finite() and val_u1 > Decimal("0"):
-            umbral1 = val_u1
-    except (InvalidOperation, ValueError, TypeError):
-        umbral1 = Decimal("5000.0")
-
-    umbral2 = Decimal("15000.0")
-    try:
-        val_u2 = Decimal(os.getenv("RECOMENDACION_UMBRAL_PLAZO_2", "15000.0"))
-        if val_u2.is_finite() and val_u2 > Decimal("0"):
-            umbral2 = val_u2
-    except (InvalidOperation, ValueError, TypeError):
-        umbral2 = Decimal("15000.0")
+    pct = _leer_decimal("RECOMENDACION_DESCUENTO_PCT", Decimal("10.0"), Decimal("0"), Decimal("10.0"))
+    dias = _leer_entero("RECOMENDACION_DESCUENTO_DIAS", 5, 0)
+    umbral1 = _leer_decimal("RECOMENDACION_UMBRAL_PLAZO_1", Decimal("5000.0"), Decimal("0"))
+    umbral2 = _leer_decimal("RECOMENDACION_UMBRAL_PLAZO_2", Decimal("15000.0"), Decimal("0"))
 
     if not (umbral1 < umbral2):
         umbral1 = Decimal("5000.0")
