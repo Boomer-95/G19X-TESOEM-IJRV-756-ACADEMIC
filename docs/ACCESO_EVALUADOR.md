@@ -86,6 +86,8 @@ que la identidad corresponde a la cuenta dedicada, sin publicar sus datos.
 - [X] Subir usuario/contraseña SOLO en TODO Academy → Técnicos → Accesos de prueba (dentro de Mis documentos).
 - [X] Confirmar que ninguna credencial aparece en GitHub.
 
+**Fecha de la última prueba exitosa de acceso:** 29 de octubre de 2026 (realizada con la cuenta Microsoft dedicada de evaluación y su propia contraseña, sin utilizar el correo personal del desarrollador).
+**Última prueba completa de la cuenta dedicada:** 3 de noviembre de 2026 (incógnito, dashboard y `/auth/me` con 200).
 Si el registro exige asignación, asignar la cuenta dedicada sin relajar esa
 política. Mantener las políticas de seguridad del tenant; si algún requisito
 impide la evaluación, el responsable debe resolver el acceso antes de entregar.

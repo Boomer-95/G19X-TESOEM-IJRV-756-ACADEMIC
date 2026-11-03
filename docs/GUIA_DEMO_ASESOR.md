@@ -34,22 +34,43 @@ Complete `.env` localmente, sin publicar sus valores:
 - `COMMUNICATIONS_REAL_ENABLED=false`: obligatorio. No configure Twilio ni SendGrid para esta demo.
 - `GROQ_API_KEY`: no es necesaria para **Evaluar cartera**; solo si se necesita generar nuevas estrategias o adaptar SMS/llamadas; recibirla privadamente. Sin ella se pueden consultar los datos y estrategias históricas; las operaciones que requieren IA muestran servicio no configurado.
 
-Para separar el volumen de otra instalación, añada a este `.env` nuevo un `COMPOSE_PROJECT_NAME` exclusivo, por ejemplo `motor-cobranza-demo-asesor`. No cambie el nombre de proyecto de una instalación operativa existente. Los puertos 8000 y 8080 deben estar libres. Docker construye la conexión usando el servicio `db`; no hace falta configurar `DATABASE_URL` para estos comandos.
+Para separar los contenedores y el volumen `postgres_data` de cualquier instalación habitual o existente, utilice un `COMPOSE_PROJECT_NAME` independiente, por ejemplo `motor-cobranza-demo`. No cambie el nombre de proyecto ni elimine los volúmenes de una instalación operativa existente. Puede definir `COMPOSE_PROJECT_NAME=motor-cobranza-demo` dentro del archivo `.env` nuevo y/o establecerlo en la sesión de terminal antes de ejecutar los scripts de restauración y despliegue:
+
+- **Linux/macOS:** `export COMPOSE_PROJECT_NAME=motor-cobranza-demo`
+- **Windows PowerShell:** `$env:COMPOSE_PROJECT_NAME = 'motor-cobranza-demo'`
+
+Asegúrese de que tanto el comando de restauración como el de despliegue utilicen exactamente el mismo `COMPOSE_PROJECT_NAME`. Los puertos 8000 y 8080 deben estar libres. Docker construye la conexión usando el servicio `db`; no hace falta configurar `DATABASE_URL` para estos comandos.
 
 El revisor utiliza una **cuenta Microsoft dedicada de evaluación**, no la cuenta personal del desarrollador. Las credenciales se comparten únicamente por **TODO Academy → Mis documentos → Técnicos → Accesos de prueba**. Consulte [Acceso del evaluador y checklist de entrega](ACCESO_EVALUADOR.md). No copie IDs, claves o tokens a capturas públicas ni al repositorio.
+
+## Qué trae el documento privado (Accesos de prueba)
+
+El archivo privado `PERFIL.md`, ubicado en TODO Academy → Mis documentos → Técnicos → Accesos de prueba, contiene los siguientes elementos. Se documentan únicamente sus nombres, nunca sus valores:
+
+- Cuenta Microsoft dedicada de evaluación y su contraseña.
+- `ENTRA_CLIENT_ID` y `ENTRA_TENANT_ID`.
+- `VITE_ENTRA_CLIENT_ID` y `VITE_ENTRA_TENANT_ID`, que utilizan los mismos identificadores correspondientes del backend.
+- `VITE_ENTRA_API_SCOPE`.
+- `VITE_ENTRA_REDIRECT_URI`.
+- `ENTRA_REQUIRED_SCOPE`.
+- `GROQ_API_KEY` (opcional: solo para generar estrategias nuevas mediante Groq).
+
+Los identificadores y la configuración de Microsoft Entra son necesarios para configurar correctamente el frontend y el backend y permitir la autenticación del evaluador. `GROQ_API_KEY` es opcional: si falta, se puede iniciar sesión y consultar los datos históricos, pero no generar nuevas estrategias mediante Groq.
 
 ## Restauración y despliegue
 
 Linux/macOS:
 
 ```bash
+export COMPOSE_PROJECT_NAME=motor-cobranza-demo
 bash scripts/restaurar_demo.sh
 bash scripts/deploy_demo.sh
 ```
 
-Windows PowerShell, desde la raíz del repositorio:
+Windows PowerShell, desde la raíz del repositorio (`motor-cobranza-ia`):
 
 ```powershell
+$env:COMPOSE_PROJECT_NAME = 'motor-cobranza-demo'
 .\scripts\restaurar_demo.ps1
 .\scripts\deploy_demo.ps1
 ```
@@ -106,24 +127,46 @@ Cada cliente se confirma por separado; un fallo revierte ese cliente y el lote c
 
 ## Conservación de la demo
 
-- **No usar `docker compose down -v`** durante la operación normal: elimina los volúmenes y sus datos.
+- **No usar `docker compose down -v`** ni en una instalación normal ni como procedimiento habitual: elimina los volúmenes y sus datos.
+- **No eliminar volúmenes de una instalación existente.** Para realizar un ensayo limpio o una instalación de demostración separada, configure un `COMPOSE_PROJECT_NAME` independiente (por ejemplo `motor-cobranza-demo`).
 - **No ejecutar seeds** después de importar el SQL.
-- No repetir la restauración en una base con datos: el script se negará. Para actualizar esta demo use `deploy_demo.sh` o `deploy_demo.ps1`, que conserva los datos y migra antes del arranque.
+- No repetir la restauración en una base con datos: el script se negará. Para actualizar esta demo use `deploy_demo.sh` o `deploy_demo.ps1` con el mismo `COMPOSE_PROJECT_NAME`, que conserva los datos y migra antes del arranque.
 - Los mensajes simulados no implican envíos. Algunas pruebas aisladas ejercitan proveedores mediante mocks; nunca se necesitan contactos reales para esta guía.
 
 ## Ensayo de Instalación Limpia y Registro de Tiempos
 
-Durante el ensayo de instalación desde cero en entorno limpio se registraron los siguientes tiempos reales de ejecución:
+Datos del entorno y ejecución registrados durante el ensayo de instalación limpia en Linux:
 
-| Fase | Comando / Acción | Tiempo medido |
+- **Fecha del ensayo:** `2026-10-29` (29 de octubre de 2026).
+- **Sistema operativo utilizado:** `Linux Mint 22.3 (Zena)` *(basado en Ubuntu 24.04 `noble`; el ensayo interactivo se ejecutó en Linux, no en Windows)*.
+- **Versión de Docker:** `Docker version 29.1.3, build 29.1.3-0ubuntu3~24.04.2`.
+- **Versión de Docker Compose:** `Docker Compose version v5.5.1`.
+- **Scripts utilizados:** `scripts/restaurar_demo.sh` y `scripts/deploy_demo.sh` *(los scripts `scripts/restaurar_demo.ps1` y `scripts/deploy_demo.ps1` solo cuentan con validación automatizada; la ejecución real en Windows sigue pendiente)*.
+
+Durante el ensayo de instalación desde cero en entorno limpio se registraron los siguientes tiempos y resultados por fase:
+
+| Fase | Comando / Acción | Tiempo medido / Resultado |
 |---|---|---|
 | Clonación del repositorio | `git clone URL_DEL_REPOSITORIO_ENTREGADA motor-cobranza-ia` | ~5 a 10 segundos |
 | Restauración de datos de prueba | `bash scripts/restaurar_demo.sh` | ~30 segundos |
 | Compilación y despliegue de contenedores | `bash scripts/deploy_demo.sh` | ~1 minuto con 10 segundos |
+| Inicio de sesión y visualización del dashboard | Abrir `http://localhost:8080/` en incógnito, iniciar sesión con la cuenta dedicada y esperar a que cargue el dashboard | ~15 segundos |
 
-**Nota técnica sobre incidencias menores resueltas (guía para el evaluador):**
-- **Liberación preventiva del puerto 8000:** Si el equipo anfitrión mantiene en ejecución otra instancia local del proyecto o servicio en el puerto `8000` (o `8080`), es necesario detenerla preventivamente antes del despliegue para evitar colisiones de puertos.
-- **Limpieza previa de volúmenes para nuevas restauraciones:** Dado que `restaurar_demo.sh` protege los datos existentes y aborta si detecta tablas en el esquema `public`, cuando se requiera realizar una nueva restauración limpia desde cero sobre un proyecto previamente inicializado es indispensable eliminar antes el volumen de base de datos con `docker compose down -v` (o definir un `COMPOSE_PROJECT_NAME` nuevo en `.env`).
+### Verificación de inicio de sesión con la cuenta de evaluación y visualización del dashboard
+
+Estado de los pasos de la prueba interactiva de Microsoft Entra ID ejecutada el `2026-11-03` utilizando la cuenta Microsoft dedicada de evaluación (con su propia contraseña, sin usar el correo personal del desarrollador), conforme a [Acceso del evaluador y checklist de entrega](ACCESO_EVALUADOR.md):
+
+1. **Abrir la aplicación en incógnito (`http://localhost:8080/`):** Verificado (`[X]` en checklist de entrega).
+2. **Iniciar sesión con la cuenta Microsoft dedicada de evaluación:** Verificado (`[X]` en checklist de entrega).
+3. **Visualizar el dashboard:** Verificado (`[X]` en checklist de entrega).
+4. **Confirmar que `/auth/me` (`/backend/auth/me` vía proxy en Docker) responde HTTP 200:** Verificado (`[X]` en checklist de entrega).
+5. **Cerrar sesión:** Verificado (`[X]` en checklist de entrega).
+6. **Volver a iniciar sesión:** Verificado (`[X]` en checklist de entrega).
+
+### Incidencias encontradas y cómo se resolvieron
+
+- **Liberación preventiva del puerto 8000 (y 8080):** Si el equipo anfitrión mantiene en ejecución otra instancia local del proyecto o servicio en el puerto `8000` (o `8080`), se produce una colisión de puertos al iniciar los contenedores. **Resolución:** detener preventivamente los contenedores o procesos locales que ocupen esos puertos antes de ejecutar el despliegue, conservando intactos sus volúmenes.
+- **Aislamiento de contenedores y volúmenes para ensayos limpios:** Dado que `restaurar_demo.sh` (y `restaurar_demo.ps1`) protege los datos existentes y aborta si detecta tablas en el esquema `public`, no se debe sobrescribir una base ya inicializada ni ejecutar `docker compose down -v` para borrar volúmenes existentes. **Resolución:** definir un `COMPOSE_PROJECT_NAME` independiente (por ejemplo `motor-cobranza-demo`, o un nuevo identificador exclusivo si se requiere otro ensayo limpio) en `.env` y en la sesión de terminal (`export COMPOSE_PROJECT_NAME=motor-cobranza-demo` en Linux/macOS o `$env:COMPOSE_PROJECT_NAME = 'motor-cobranza-demo'` en Windows PowerShell) tanto al restaurar como al desplegar, separando así los contenedores y el volumen de base de datos de cualquier instalación habitual.
 
 ## Limitación de dependencias de desarrollo
 

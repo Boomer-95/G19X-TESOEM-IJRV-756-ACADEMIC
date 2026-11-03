@@ -11,9 +11,10 @@ Requisitos: Git, Docker Desktop (Windows/macOS) o Docker Engine con Compose v2 (
 ### Linux/macOS
 
 ```bash
-git clone https://github.com/Boomer-95/G19X-TESOEM-IJRV-756-ACADEMIC.git motor-cobranza-demo && cd motor-cobranza-demo
+git clone https://github.com/Boomer-95/G19X-TESOEM-IJRV-756-ACADEMIC.git motor-cobranza-ia && cd motor-cobranza-ia
 cp -n .env.example .env
-${EDITOR:-nano} .env  # Complete PostgreSQL y Entra; COMPOSE_PROJECT_NAME exclusivo; COMMUNICATIONS_REAL_ENABLED=false
+export COMPOSE_PROJECT_NAME=motor-cobranza-demo
+${EDITOR:-nano} .env  # Complete PostgreSQL y Entra; COMPOSE_PROJECT_NAME=motor-cobranza-demo; COMMUNICATIONS_REAL_ENABLED=false
 bash scripts/restaurar_demo.sh
 bash scripts/deploy_demo.sh
 ```
@@ -21,14 +22,15 @@ bash scripts/deploy_demo.sh
 ### Windows PowerShell
 
 ```powershell
-git clone https://github.com/Boomer-95/G19X-TESOEM-IJRV-756-ACADEMIC.git motor-cobranza-demo; if ($LASTEXITCODE -ne 0) { throw 'No se pudo clonar.' }; Set-Location motor-cobranza-demo
+git clone https://github.com/Boomer-95/G19X-TESOEM-IJRV-756-ACADEMIC.git motor-cobranza-ia; if ($LASTEXITCODE -ne 0) { throw 'No se pudo clonar.' }; Set-Location motor-cobranza-ia
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
-notepad .env  # Complete PostgreSQL y Entra; COMPOSE_PROJECT_NAME exclusivo; COMMUNICATIONS_REAL_ENABLED=false
+$env:COMPOSE_PROJECT_NAME = 'motor-cobranza-demo'
+notepad .env  # Complete PostgreSQL y Entra; COMPOSE_PROJECT_NAME=motor-cobranza-demo; COMMUNICATIONS_REAL_ENABLED=false
 .\scripts\restaurar_demo.ps1
 .\scripts\deploy_demo.ps1
 ```
 
-Abra **http://localhost:8080/**. La [guía demo](docs/GUIA_DEMO_ASESOR.md) detalla las variables, requisitos y permisos de scripts. Restauración solo en BD vacía; no borra datos. No ejecutar seeds después ni `docker compose down -v`. Mantenga `COMMUNICATIONS_REAL_ENABLED=false`; Groq no es necesario para consultar los escenarios precargados.
+Abra **http://localhost:8080/**. La [guía demo](docs/GUIA_DEMO_ASESOR.md) detalla las variables, requisitos y permisos de scripts. Usar el mismo `COMPOSE_PROJECT_NAME` independiente (por ejemplo `motor-cobranza-demo`) en restauración y despliegue separa contenedores y volúmenes de cualquier instalación habitual. Restauración solo en BD vacía; no borra datos. No eliminar volúmenes existentes, no ejecutar `docker compose down -v` ni ejecutar seeds después. Mantenga `COMMUNICATIONS_REAL_ENABLED=false`; Groq no es necesario para consultar los escenarios precargados.
 
 ## Acceso de evaluación
 
