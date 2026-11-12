@@ -76,14 +76,10 @@ $env:COMPOSE_PROJECT_NAME = 'motor-cobranza-demo'
 ```
 
 Cierre el editor después de completar `.env` antes de ejecutar la restauración.
-Si Windows marca los scripts descargados como bloqueados, revise su contenido y
-use `Get-ChildItem .\scripts\*.ps1 | Unblock-File`. Si su política exige scripts
-firmados, solicite el procedimiento autorizado por su administrador; no se cambia
-la política de equipo desde estos scripts. Puede usar `powershell -NoProfile -File
-.\scripts\restaurar_demo.ps1` (o `pwsh`) y su equivalente de deploy.
+Si Windows marca los scripts descargados como bloqueados o la política de ejecución de PowerShell impide ejecutarlos en la sesión, revise su contenido, desbloquee los archivos con `Get-ChildItem .\scripts\*.ps1 | Unblock-File` y habilite una política `Bypass` limitada exclusivamente a la sesión actual (`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`), o bien invóquelos por archivo con `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\restaurar_demo.ps1` (y su equivalente para `deploy_demo.ps1`). No se modifica la política de ejecución permanente del equipo ni del usuario.
 
 Los `.ps1` delegan a `demo_windows.py` (biblioteca estándar Python), que llama a
-Docker Compose directamente. El host Windows no necesita `sh`: el `sh -c` de los
+Docker Compose directamente. PostgreSQL se ejecuta íntegramente mediante Docker (servicio `db`), sin requerir una instalación local independiente de PostgreSQL en Windows. El host Windows no necesita `sh`: el `sh -c` de los
 comandos SQL corre dentro del contenedor Linux de PostgreSQL. Compose lee `.env`
 y los overrides del entorno; su JSON efectivo solo pasa al validador existente
 `validar_config_demo.py`, sin imprimirse. Se exige el valor efectivo
@@ -92,11 +88,7 @@ como bytes por stdin para preservar UTF-8 y COPY también con PowerShell 5.1.
 Los errores de Compose se muestran como fallos de fase sin valores privados; los
 errores SQL usan las categorías filtradas de `mostrar_error_importacion.py`.
 
-Validación local del camino Windows: se prueban el ejecutor Python con Docker
-simulado y la estructura estática de las entradas `.ps1`. En el entorno Linux de
-esta revisión no está instalado PowerShell; no se ejecutaron los `.ps1` ni Docker
-Desktop Windows. Queda pendiente el smoke test en Windows: restauración en
-proyecto nuevo, despliegue, acceso Entra y rechazo al repetir la restauración.
+Validación del camino Windows: además de las pruebas automatizadas del ejecutor Python y de la estructura de las entradas `.ps1`, el `2026-11-10` se ejecutó y confirmó en **Windows 10** la prueba real de clonación, configuración de `.env`, restauración de `db/base-de-datos.sql` con `scripts/restaurar_demo.ps1`, despliegue con `scripts/deploy_demo.ps1`, acceso al frontend (`http://localhost:8080/`), documentación de FastAPI (`http://localhost:8000/docs`) e inicio de sesión con Microsoft Entra ID con acceso al dashboard (véase el detalle en la sección de ensayos más abajo). La comprobación de rechazo al repetir la restauración sobre una base ya poblada está cubierta por la validación automatizada y el ensayo en Linux; no se ejecutó una segunda pasada de `restaurar_demo.ps1` durante la sesión de Windows 10.
 
 `restaurar_demo.sh` y `restaurar_demo.ps1` levantan solo `db`, espera su healthcheck y consulta si el esquema `public` está vacío. Si contiene tablas, se detiene sin importar, borrar ni reemplazar datos. En una base vacía importa el SQL dentro de una única transacción y consulta realmente los conteos:
 
@@ -135,15 +127,50 @@ Cada cliente se confirma por separado; un fallo revierte ese cliente y el lote c
 
 ## Ensayo de Instalación Limpia y Registro de Tiempos
 
+### Prueba de instalación en Windows 10 (10 de noviembre de 2026)
+
+Datos del entorno y resultados verificados durante la prueba real de instalación y despliegue en Windows 10:
+
+- **Fecha de la prueba:** `2026-11-10` (10 de noviembre de 2026).
+- **Sistema operativo:** `Windows 10`.
+- **Docker Desktop:** `4.99.0`.
+- **Docker Engine:** `29.9.3`.
+- **Docker Compose:** `5.7.0`.
+- **Git:** `2.56.1.windows.1`.
+- **Python:** `3.14.10`.
+- **Terminal / Shell:** `PowerShell`.
+- **Base de datos:** PostgreSQL ejecutado mediante Docker (servicio contenedorizado `db`), sin instalación local independiente en el sistema anfitrión.
+- **Scripts ejecutados:** `scripts/restaurar_demo.ps1` y `scripts/deploy_demo.ps1`.
+
+Pruebas realizadas y confirmadas (no se cronometraron tiempos individuales por fase en esta ejecución):
+
+1. Clonación exitosa del repositorio desde GitHub.
+2. Creación y configuración local del archivo `.env` (sin exponer valores privados).
+3. Ejecución exitosa de `scripts/restaurar_demo.ps1`.
+4. Restauración de `db/base-de-datos.sql` sobre el contenedor de PostgreSQL en Docker, obteniendo los siguientes conteos verificados:
+   - `clientes`: 15
+   - `deudas`: 23
+   - `pagos`: 40
+   - `historial_mensajes`: 24
+   - `comunicaciones`: 24
+   - `metricas_snapshots`: 15
+   - `administradores`: 0
+5. Ejecución exitosa de `scripts/deploy_demo.ps1`.
+6. Frontend accesible en `http://localhost:8080/`.
+7. Documentación interactiva de FastAPI accesible en `http://localhost:8000/docs`.
+8. Inicio de sesión con Microsoft Entra ID y acceso al dashboard.
+
+### Ensayo de instalación limpia y tiempos en Linux (29 de octubre de 2026)
+
 Datos del entorno y ejecución registrados durante el ensayo de instalación limpia en Linux:
 
 - **Fecha del ensayo:** `2026-10-29` (29 de octubre de 2026).
-- **Sistema operativo utilizado:** `Linux Mint 22.3 (Zena)` *(basado en Ubuntu 24.04 `noble`; el ensayo interactivo se ejecutó en Linux, no en Windows)*.
+- **Sistema operativo utilizado:** `Linux Mint 22.3 (Zena)` *(basado en Ubuntu 24.04 `noble`)*.
 - **Versión de Docker:** `Docker version 29.1.3, build 29.1.3-0ubuntu3~24.04.2`.
 - **Versión de Docker Compose:** `Docker Compose version v5.5.1`.
-- **Scripts utilizados:** `scripts/restaurar_demo.sh` y `scripts/deploy_demo.sh` *(los scripts `scripts/restaurar_demo.ps1` y `scripts/deploy_demo.ps1` solo cuentan con validación automatizada; la ejecución real en Windows sigue pendiente)*.
+- **Scripts utilizados:** `scripts/restaurar_demo.sh` y `scripts/deploy_demo.sh` *(la ejecución equivalente en Windows 10 con `scripts/restaurar_demo.ps1` y `scripts/deploy_demo.ps1` quedó verificada el `2026-11-10`, según se detalla arriba)*.
 
-Durante el ensayo de instalación desde cero en entorno limpio se registraron los siguientes tiempos y resultados por fase:
+Durante el ensayo de instalación desde cero en entorno limpio en Linux se registraron los siguientes tiempos y resultados por fase:
 
 | Fase | Comando / Acción | Tiempo medido / Resultado |
 |---|---|---|
@@ -154,7 +181,7 @@ Durante el ensayo de instalación desde cero en entorno limpio se registraron lo
 
 ### Verificación de inicio de sesión con la cuenta de evaluación y visualización del dashboard
 
-Estado de los pasos de la prueba interactiva de Microsoft Entra ID ejecutada el `2026-11-03` utilizando la cuenta Microsoft dedicada de evaluación (con su propia contraseña, sin usar el correo personal del desarrollador), conforme a [Acceso del evaluador y checklist de entrega](ACCESO_EVALUADOR.md):
+Estado de los pasos de la prueba interactiva de Microsoft Entra ID ejecutada el `2026-11-03` en Linux utilizando la cuenta Microsoft dedicada de evaluación (con su propia contraseña, sin usar el correo personal del desarrollador), conforme a [Acceso del evaluador y checklist de entrega](ACCESO_EVALUADOR.md), y complementada el `2026-11-10` en Windows 10 con el inicio de sesión mediante Microsoft Entra ID y acceso al dashboard en `http://localhost:8080/`:
 
 1. **Abrir la aplicación en incógnito (`http://localhost:8080/`):** Verificado (`[X]` en checklist de entrega).
 2. **Iniciar sesión con la cuenta Microsoft dedicada de evaluación:** Verificado (`[X]` en checklist de entrega).
@@ -165,6 +192,7 @@ Estado de los pasos de la prueba interactiva de Microsoft Entra ID ejecutada el 
 
 ### Incidencias encontradas y cómo se resolvieron
 
+- **Política de ejecución de PowerShell y bloqueo de scripts en Windows 10:** Durante la prueba en Windows 10, la política de ejecución de PowerShell y el marcado de archivos impidieron inicialmente ejecutar `scripts/restaurar_demo.ps1` y `scripts/deploy_demo.ps1`. **Resolución:** desbloquear los scripts con `Unblock-File` (`Get-ChildItem .\scripts\*.ps1 | Unblock-File`) y aplicar una política de ejecución `Bypass` limitada exclusivamente a la sesión actual de PowerShell (`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`), sin modificar de forma permanente la política del sistema ni del usuario.
 - **Liberación preventiva del puerto 8000 (y 8080):** Si el equipo anfitrión mantiene en ejecución otra instancia local del proyecto o servicio en el puerto `8000` (o `8080`), se produce una colisión de puertos al iniciar los contenedores. **Resolución:** detener preventivamente los contenedores o procesos locales que ocupen esos puertos antes de ejecutar el despliegue, conservando intactos sus volúmenes.
 - **Aislamiento de contenedores y volúmenes para ensayos limpios:** Dado que `restaurar_demo.sh` (y `restaurar_demo.ps1`) protege los datos existentes y aborta si detecta tablas en el esquema `public`, no se debe sobrescribir una base ya inicializada ni ejecutar `docker compose down -v` para borrar volúmenes existentes. **Resolución:** definir un `COMPOSE_PROJECT_NAME` independiente (por ejemplo `motor-cobranza-demo`, o un nuevo identificador exclusivo si se requiere otro ensayo limpio) en `.env` y en la sesión de terminal (`export COMPOSE_PROJECT_NAME=motor-cobranza-demo` en Linux/macOS o `$env:COMPOSE_PROJECT_NAME = 'motor-cobranza-demo'` en Windows PowerShell) tanto al restaurar como al desplegar, separando así los contenedores y el volumen de base de datos de cualquier instalación habitual.
 
