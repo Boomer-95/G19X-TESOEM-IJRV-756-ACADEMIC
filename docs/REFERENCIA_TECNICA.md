@@ -120,14 +120,149 @@ npm run dev
 
 Frontend: http://localhost:5173. API local: http://127.0.0.1:8000 y documentación en `/docs`. La migración añade columnas faltantes de comunicaciones, vínculo pago/deuda, probabilidad y contexto de estrategias, e índices; no atribuye estados de proveedor ni relaciones a registros históricos desconocidos. `create_all` por sí solo no actualiza tablas existentes.
 
-Solo para una base controlada de demostración, los seeds crean clientes faltantes e historial sintético sin resetear cartera:
+Solo para una base controlada de demostración inicializada desde cero sin usar el dump SQL, los seeds crean clientes faltantes e historial sintético sin resetear cartera:
 
 ```bash
 python -m app.seed
 python -m app.ml.seed_historial
 ```
 
-No ejecutar seeds sobre datos reales como parte de una auditoría. El artefacto ML existente se conserva; `python -m app.ml.train_model` lo reemplaza y requiere una decisión explícita.
+No ejecutar seeds sobre datos reales como parte de una auditoría ni sobre una base donde se haya importado `db/base-de-datos.sql`. El artefacto ML existente se conserva; `python -m app.ml.train_model` lo reemplaza y requiere una decisión explícita.
+
+### Importación de `db/base-de-datos.sql` y ejecución sin Docker
+
+Cuando se instala manualmente para ejecutar PostgreSQL local, FastAPI y Vite fuera de Docker y se desea cargar la cartera demostrativa incluida en `db/base-de-datos.sql` sobre PostgreSQL 16, el archivo ya contiene el esquema completo (`administradores`, `clientes`, `comunicaciones`, `deudas`, `historial_mensajes`, `metricas_snapshots` y `pagos`), secuencias, claves foráneas, índices y datos ficticios. **No requiere ni debe combinarse con la ejecución previa o posterior de `python -m app.seed` ni `python -m app.ml.seed_historial`.**
+
+> **Nota sobre autenticación PostgreSQL en este equipo:** la conexión TCP directa con el superusuario `postgres` (`psql -h localhost -p 5432 -U postgres ...`) falla por autenticación de contraseña. Para tareas administrativas iniciales debe utilizarse la sesión local por socket Unix mediante `sudo -u postgres psql`. No modifique la contraseña del rol compartido `admin` ni altere otras bases de datos existentes en la instancia local. Asimismo, en este equipo ya fueron creados el rol `motor_cobranza_local_app` y la base `motor_cobranza_local`, por lo que no debe intentarse crearlos nuevamente sobre la base ya preparada.
+
+#### Orden correcto de ejecución
+
+1. Crear y activar el entorno virtual e instalar las dependencias de Python (`python -m pip install -r requirements-dev.txt`).
+2. En una instalación nueva, crear con `sudo -u postgres psql` el rol dedicado `motor_cobranza_local_app` (con `LOGIN` y contraseña asignada mediante `\password`) y la base vacía `motor_cobranza_local` con ese rol como propietario.
+3. Importar `db/base-de-datos.sql` haciendo que los objetos queden bajo el rol propietario `motor_cobranza_local_app` y comprobar los conteos de las tablas.
+4. Configurar `.env` (`DATABASE_URL` con el usuario `motor_cobranza_local_app`, variables Entra y `COMMUNICATIONS_REAL_ENABLED=false`, dejando `DB_HOST` sin definir).
+5. Ejecutar `python -m app.migrate` con el mismo usuario propietario `motor_cobranza_local_app`.
+6. Iniciar FastAPI en `http://127.0.0.1:8000` (al arrancar, `app/main.py` ejecuta `validar_esquema(engine)` y aborta si la base está vacía o incompleta) y Vite en `http://localhost:5173/`.
+
+#### A. Procedimiento recomendado para una instalación nueva
+
+##### 1. Crear el rol de aplicación y la base de datos vacía
+
+Abrir una sesión administrativa local con `sudo -u postgres psql`, crear el rol dedicado `motor_cobranza_local_app`, asignarle contraseña interactivamente con `\password` y crear la base `motor_cobranza_local` asignándole ese rol como propietario:
+
+```bash
+sudo -u postgres psql
+```
+
+Dentro de `psql`:
+
+```sql
+CREATE ROLE motor_cobranza_local_app WITH LOGIN;
+\password motor_cobranza_local_app
+CREATE DATABASE motor_cobranza_local OWNER motor_cobranza_local_app;
+\q
+```
+
+##### 2. Importar `db/base-de-datos.sql` bajo el rol propietario
+
+Desde la raíz del repositorio, enviar un bloque transaccional explícito (`BEGIN;` y `COMMIT;`) junto con `SET ROLE motor_cobranza_local_app;` y el contenido de `db/base-de-datos.sql` por la entrada estándar de `psql` (leer el archivo desde el usuario actual evita problemas de permisos del usuario `postgres` sobre el directorio personal y preserva los bloques `COPY` y comandos especiales del dump):
+
+```bash
+{
+  printf 'BEGIN;\n'
+  printf 'SET ROLE motor_cobranza_local_app;\n'
+  cat db/base-de-datos.sql
+  printf '\nCOMMIT;\n'
+} | sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d motor_cobranza_local
+```
+
+*(De forma equivalente, una vez asignada la contraseña a `motor_cobranza_local_app`, también puede importarse por TCP directamente con ese rol propietario: `psql -X -v ON_ERROR_STOP=1 --single-transaction -h localhost -p 5432 -U motor_cobranza_local_app -d motor_cobranza_local -f db/base-de-datos.sql`).*
+
+##### 3. Comprobar que la importación terminó correctamente
+
+Verificar la conexión TCP del rol `motor_cobranza_local_app` y consultar los conteos de las tablas en el esquema `public`:
+
+```bash
+psql -X -v ON_ERROR_STOP=1 -h localhost -p 5432 -U motor_cobranza_local_app -d motor_cobranza_local -c "
+SELECT 'clientes' AS tabla, count(*) FROM public.clientes
+UNION ALL SELECT 'deudas', count(*) FROM public.deudas
+UNION ALL SELECT 'pagos', count(*) FROM public.pagos
+UNION ALL SELECT 'historial_mensajes', count(*) FROM public.historial_mensajes
+UNION ALL SELECT 'comunicaciones', count(*) FROM public.comunicaciones
+UNION ALL SELECT 'metricas_snapshots', count(*) FROM public.metricas_snapshots
+UNION ALL SELECT 'administradores', count(*) FROM public.administradores;
+"
+```
+
+La importación es correcta si devuelve exactamente:
+- `clientes`: `15`
+- `deudas`: `23`
+- `pagos`: `40`
+- `historial_mensajes`: `24`
+- `comunicaciones`: `24`
+- `metricas_snapshots`: `15`
+- `administradores`: `0`
+
+##### 4. Variables de entorno, migración y arranque de FastAPI y React/Vite
+
+1. **Backend (`.env` en la raíz del repositorio):** configurar `DATABASE_URL` con el usuario propietario `motor_cobranza_local_app` y su contraseña (`<PASSWORD_APP>`), completar los identificadores de Microsoft Entra y mantener `DB_HOST` comentado o vacío (en `app/database.py`, si `DB_HOST` está definido tiene prioridad sobre `DATABASE_URL` y exige `POSTGRES_USER`, `POSTGRES_PASSWORD` y `POSTGRES_DB`):
+
+   ```ini
+   DATABASE_URL=postgresql+psycopg2://motor_cobranza_local_app:<PASSWORD_APP>@localhost:5432/motor_cobranza_local
+   # DB_HOST=
+   ENTRA_CLIENT_ID=<CLIENT_ID>
+   ENTRA_TENANT_ID=<TENANT_ID>
+   ENTRA_REQUIRED_SCOPE=access_as_user
+   COMMUNICATIONS_REAL_ENABLED=false
+   CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080
+   ```
+
+2. **Migración y arranque de FastAPI (puerto `8000`):** ejecutar `python -m app.migrate` con el mismo usuario propietario configurado en `DATABASE_URL` e iniciar Uvicorn:
+
+   ```bash
+   source venv/bin/activate
+   python -m app.migrate
+   uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+   ```
+
+3. **Frontend (`frontend-react/.env.local` o variables exportadas en la terminal de Vite, puerto `5173`):** dado que Vite no carga el `.env` de la raíz, definir en `frontend-react/.env.local` (sin incluir secretos):
+
+   ```ini
+   VITE_API_URL=http://127.0.0.1:8000
+   VITE_ENTRA_CLIENT_ID=<CLIENT_ID>
+   VITE_ENTRA_TENANT_ID=<TENANT_ID>
+   VITE_ENTRA_API_SCOPE=api://<CLIENT_ID>/access_as_user
+   VITE_ENTRA_REDIRECT_URI=http://localhost:5173/
+   ```
+
+   Iniciar el servidor de desarrollo en otra terminal:
+
+   ```bash
+   cd frontend-react
+   npm ci
+   npm run dev
+   ```
+
+   Abrir `http://localhost:5173/` en el navegador e iniciar sesión con Microsoft Entra ID.
+
+#### B. Procedimiento realmente ejecutado y resultados de la prueba local (Linux Mint, 12 de noviembre de 2026)
+
+El `2026-11-12` se realizó en **Linux Mint** la prueba real de instalación y ejecución de PostgreSQL local, FastAPI y Vite fuera de Docker:
+
+- **Secuencia real aplicada en PostgreSQL local `16.15`:**
+  1. Mediante administración local (`sudo -u postgres`), la base independiente `motor_cobranza_local` se creó inicialmente con propietario `admin` y se importó `db/base-de-datos.sql` usando `SET ROLE admin`.
+  2. Para no cambiar la contraseña del rol compartido `admin` ni afectar otras bases de datos del sistema, se creó después el rol dedicado `motor_cobranza_local_app` con `LOGIN` y contraseña propia, se transfirió la propiedad de la base `motor_cobranza_local` a `motor_cobranza_local_app` y se reasignaron los objetos de la base a dicho rol.
+  3. Se configuró `DATABASE_URL` con `motor_cobranza_local_app` hacia `localhost:5432/motor_cobranza_local` y se comprobó que tanto la conexión TCP como `python -m app.migrate` funcionaron sin errores y conservando los datos.
+- **Estado de contenedores durante la prueba:** el contenedor Docker `motor_cobranza-db-1` permaneció activo en segundo plano durante la sesión, pero **no se utilizó**; PostgreSQL local `16.15` (`motor_cobranza_local`), FastAPI (`http://127.0.0.1:8000`) y React/Vite (`http://localhost:5173/`) se ejecutaron íntegramente fuera de Docker.
+- **Resultados funcionales comprobados:**
+  - **Conteos tras importar `db/base-de-datos.sql` y ejecutar `python -m app.migrate`:** `15` clientes, `23` deudas, `40` pagos, `24` `historial_mensajes`, `24` `comunicaciones`, `15` `metricas_snapshots` y `0` `administradores`.
+  - **Autenticación y cartera:** inicio de sesión exitoso con Microsoft Entra ID en `http://localhost:5173/`, carga del dashboard y visualización de los `15` clientes en la sección de clientes con apertura de sus fichas y consulta de sus deudas.
+  - **Indicadores mostrados en el dashboard:**
+    - **Deudores activos:** `14`
+    - **Saldo vencido:** `$92,400`
+    - **Clientes con estrategia IA:** `12`
+    - **Clientes sin evaluar:** `2`
+    - **Recuperación:** `41.6%`
 
 ## Docker y persistencia
 

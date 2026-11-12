@@ -1,6 +1,5 @@
 import logging
 from datetime import date
-from fastapi import HTTPException
 from ..models import Comunicacion
 from . import sendgrid_service, twilio_service
 from .configuracion import estado_proveedores, email_valido, telefono_valido
@@ -9,14 +8,20 @@ logger = logging.getLogger(__name__)
 CANALES = {'Email': 'sendgrid', 'SMS': 'twilio_sms', 'WhatsApp': 'twilio_whatsapp', 'Llamada': 'twilio_voice'}
 
 
+class DestinatarioInvalido(ValueError):
+    """Excepción de dominio cuando el contacto del cliente no es válido para el canal solicitado."""
+
+
 def registrar(db, cliente, canal, mensaje, estrategia_id=None):
     real = estado_proveedores()[CANALES[canal]]
     # La demo histórica admite clientes sin contacto. Solo el envío exige destinatario.
     if real:
         valido = email_valido(cliente.email) if canal == 'Email' else telefono_valido(cliente.telefono)
         if not valido:
-            raise HTTPException(422, 'El cliente requiere un email válido.' if canal == 'Email'
-                                else 'El cliente requiere teléfono internacional válido (E.164).')
+            raise DestinatarioInvalido(
+                'El cliente requiere un email válido.' if canal == 'Email'
+                else 'El cliente requiere teléfono internacional válido (E.164).'
+            )
     registro = Comunicacion(cliente_id=cliente.id, canal=canal, mensaje=mensaje, estrategia_id=estrategia_id,
         fecha_envio=date.today(), exitoso=False, modo='real' if real else 'simulado',
         estado='Pendiente' if real else 'Simulado',

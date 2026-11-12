@@ -142,15 +142,17 @@ async def registrar_comunicacion(
         logger.info('GroqAdaptationResponse canal=%s structure=%s', datos.canal,
                     json.dumps(diagnostico_groq.estructura_respuesta(respuesta, modelo_adaptacion, max_tokens)))
 
-    return comunicaciones.respuesta(
-        comunicaciones.registrar(
+    try:
+        registro = comunicaciones.registrar(
             db,
             cliente,
             datos.canal,
             mensaje_envio,
             **({"estrategia_id": datos.estrategia_id} if datos.estrategia_id is not None else {})
         )
-    )
+    except comunicaciones.DestinatarioInvalido as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return comunicaciones.respuesta(registro)
 
 
 @router.get("/api/integraciones/estado")

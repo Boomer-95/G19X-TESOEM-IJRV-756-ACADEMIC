@@ -222,7 +222,14 @@ def test_twilio_rest_exception_servicio_no_expone_contexto(configurado, caplog):
 def test_destinatario_invalido(client, db, headers, contacto, configurado, canal, campo, valor):
     setattr(contacto, campo, valor)
     db.commit()
-    assert enviar(client, headers, contacto, canal).status_code == 422
+    esperado = ('El cliente requiere un email válido.' if canal == 'Email'
+                else 'El cliente requiere teléfono internacional válido (E.164).')
+    with pytest.raises(comunicaciones.DestinatarioInvalido) as exc_info:
+        comunicaciones.registrar(db, contacto, canal, 'Mensaje de prueba')
+    assert str(exc_info.value) == esperado
+    res = enviar(client, headers, contacto, canal)
+    assert res.status_code == 422
+    assert res.json()['detail'] == esperado
     assert db.query(models.Comunicacion).count() == 0
     for mock in configurado:
         mock.assert_not_called()
